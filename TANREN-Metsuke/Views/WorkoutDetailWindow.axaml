@@ -1,0 +1,76 @@
+﻿<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:TANREN_Metsuke.ViewModels"
+        x:Class="TANREN_Metsuke.Views.WorkoutDetailWindow"
+        x:DataType="vm:WorkoutDetailViewModel"
+        Title="Workout Detail"
+        Width="420" SizeToContent="Height" MaxHeight="640"
+        CanResize="False"
+        Background="#0D0D1F"
+        WindowStartupLocation="CenterOwner">
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+    <!-- Header -->
+    <Border Grid.Row="0" Background="#07071A" Padding="24,20,24,16">
+      <StackPanel Spacing="4">
+        <TextBlock Text="{Binding DateString}"
+                   FontFamily="{StaticResource OxaniumFont}"
+                   FontSize="18" FontWeight="SemiBold"
+                   Foreground="#C0C8D8"/>
+        <TextBlock Text="{Binding TotalVolume}"
+                   FontFamily="{StaticResource OxaniumFont}"
+                   FontSize="13" Foreground="#606880"/>
+      </StackPanel>
+    </Border>
+
+    <!-- Divider -->
+    <Border Grid.Row="1" Height="1" Background="#1C1C38"/>
+
+    <!-- Exercise list -->
+    <ScrollViewer Grid.Row="2" Padding="0,8,0,8">
+      <ItemsControl ItemsSource="{Binding Entries}" Margin="0">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:WorkoutEntryRow">
+            <Border Margin="16,6,16,6" Padding="16,12"
+                    Background="#0D1526" CornerRadius="8">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding ExerciseName}"
+                           FontFamily="{StaticResource OxaniumFont}"
+                           FontSize="14" FontWeight="SemiBold"
+                           Foreground="#29B6F6"/>
+                <ItemsControl ItemsSource="{Binding Sets}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:WorkoutSetRow">
+                      <Grid ColumnDefinitions="52,36,16,*" Margin="0,2">
+                        <TextBlock Grid.Column="0" Text="{Binding SetLabel}"
+                                   FontFamily="{StaticResource MonoFont}"
+                                   FontSize="15" Foreground="#9E9E9E"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Reps}"
+                                   FontFamily="{StaticResource MonoFont}"
+                                   FontSize="15" Foreground="#9E9E9E"
+                                   HorizontalAlignment="Right"/>
+                        <TextBlock Grid.Column="2" Text="×"
+                                   FontFamily="{StaticResource MonoFont}"
+                                   FontSize="15" Foreground="#606880"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="3" Text="{Binding Kg}"
+                                   FontFamily="{StaticResource MonoFont}"
+                                   FontSize="15" Foreground="#9E9E9E"/>
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+    <!-- Footer spacer -->
+    <Border Grid.Row="3" Height="12"/>
+
+  </Grid>
+
+</Window>

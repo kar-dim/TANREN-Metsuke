@@ -1,0 +1,69 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:TANREN_Metsuke.ViewModels"
+             x:Class="TANREN_Metsuke.Views.SyncView"
+             x:DataType="vm:SyncViewModel">
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel MaxWidth="480" HorizontalAlignment="Center"
+                Margin="32,40,32,40" Spacing="24">
+
+      <!-- Title -->
+      <TextBlock Text="Sync with Phone"
+                 FontSize="22" FontWeight="Bold"
+                 Foreground="{StaticResource TextPrimary}" />
+
+      <!-- QR card, white background for scanner -->
+      <Border Background="White" CornerRadius="16" Padding="20"
+              HorizontalAlignment="Center"
+              IsVisible="{Binding IsReady}">
+        <Image Source="{Binding QrBitmap}" Width="280" Height="280"
+               RenderOptions.BitmapInterpolationMode="None" />
+      </Border>
+
+      <!-- QR instructions -->
+      <TextBlock IsVisible="{Binding IsReady}"
+                 Text="Open TANREN Kiroku on your phone and tap &quot;Scan QR&quot;."
+                 FontSize="15" TextWrapping="Wrap"
+                 Foreground="{StaticResource TextMuted}"
+                 HorizontalAlignment="Center" TextAlignment="Center" />
+
+      <!-- Status -->
+      <Border Background="{StaticResource CardBg}"
+              BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+              CornerRadius="8" Padding="16,12">
+        <TextBlock Text="{Binding StatusText}"
+                   FontSize="14" TextWrapping="Wrap"
+                   Foreground="{StaticResource AccentBrush}"
+                   HorizontalAlignment="Center" TextAlignment="Center" />
+      </Border>
+
+      <!-- Connection info -->
+      <TextBlock IsVisible="{Binding IsReady}"
+                 Text="{Binding ConnectionInfo}"
+                 FontSize="12" FontFamily="{StaticResource MonoFont}"
+                 Foreground="{StaticResource TextCaption}"
+                 HorizontalAlignment="Center" />
+
+      <!-- Notes -->
+      <Border IsVisible="{Binding IsReady}"
+              Background="{StaticResource ItemBg}" CornerRadius="8" Padding="16,12">
+        <StackPanel Spacing="6">
+          <TextBlock Text="Notes" FontSize="15" FontWeight="Bold"
+                     Foreground="{StaticResource TextSecondary}" />
+          <TextBlock TextWrapping="Wrap" FontSize="14"
+                     Foreground="{StaticResource TextCaption}"
+                     Text="- Phone and desktop must be on the same local network." />
+          <TextBlock TextWrapping="Wrap" FontSize="14"
+                     Foreground="{StaticResource TextCaption}"
+                     Text="- The QR code changes every time you restart the app." />
+          <TextBlock TextWrapping="Wrap" FontSize="14"
+                     Foreground="{StaticResource TextCaption}"
+                     Text="- If connection fails while using a VPN, check that it allows local network (LAN) traffic between devices. Many VPNs block this by default." />
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+
+</UserControl>

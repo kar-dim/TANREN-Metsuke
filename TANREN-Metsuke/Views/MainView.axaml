@@ -1,0 +1,104 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:TANREN_Metsuke.ViewModels"
+             xmlns:views="clr-namespace:TANREN_Metsuke.Views"
+             xmlns:material="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="700"
+             x:Class="TANREN_Metsuke.Views.MainView"
+             x:DataType="vm:MainViewModel">
+
+  <TabControl Padding="0" SelectedIndex="{Binding SelectedTabIndex}">
+    <TabControl.Template>
+      <ControlTemplate>
+        <Grid ColumnDefinitions="180,*">
+
+          <!-- Left sidebar -->
+          <Border Grid.Column="0" Background="{StaticResource SidebarBg}"
+                  BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,1,0">
+            <DockPanel>
+
+              <!-- Logo -->
+              <Image DockPanel.Dock="Top" Source="/Assets/metsuke.png" Stretch="Uniform"
+                     Margin="14,20,14,16" />
+
+              <!-- Tab items -->
+              <ItemsPresenter Name="PART_ItemsPresenter" />
+
+            </DockPanel>
+          </Border>
+
+          <!-- Content -->
+          <ContentPresenter Name="PART_SelectedContentHost"
+                            Grid.Column="1"
+                            Content="{TemplateBinding SelectedContent}"
+                            ContentTemplate="{TemplateBinding SelectedContentTemplate}" />
+
+        </Grid>
+      </ControlTemplate>
+    </TabControl.Template>
+
+    <TabItem>
+      <TabItem.Header>
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <material:MaterialIcon Kind="Home" Width="28" Height="28" />
+          <TextBlock Text="Home" />
+        </StackPanel>
+      </TabItem.Header>
+      <views:SummaryView DataContext="{Binding Summary}" />
+    </TabItem>
+
+    <TabItem>
+      <TabItem.Header>
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <material:MaterialIcon Kind="ShowChart" Width="28" Height="28" />
+          <TextBlock Text="Graphs" />
+        </StackPanel>
+      </TabItem.Header>
+      <views:GraphsView DataContext="{Binding Graphs}" />
+    </TabItem>
+
+    <TabItem>
+      <TabItem.Header>
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <material:MaterialIcon Kind="TrophyOutline" Width="28" Height="28" />
+          <TextBlock Text="Records" />
+        </StackPanel>
+      </TabItem.Header>
+      <views:RecordsView DataContext="{Binding Records}" />
+    </TabItem>
+
+    <TabItem>
+      <TabItem.Header>
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <material:MaterialIcon Kind="Cog" Width="28" Height="28" />
+          <TextBlock Text="Settings" />
+        </StackPanel>
+      </TabItem.Header>
+      <views:SettingsView DataContext="{Binding Settings}" />
+    </TabItem>
+
+    <TabItem>
+      <TabItem.Header>
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <material:MaterialIcon Kind="QrcodeScan" Width="28" Height="28" />
+          <TextBlock Text="Sync" />
+        </StackPanel>
+      </TabItem.Header>
+      <views:SyncView DataContext="{Binding Sync}" />
+    </TabItem>
+
+    <TabItem>
+      <TabItem.Header>
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <material:MaterialIcon Kind="InformationOutline" Width="28" Height="28" />
+          <TextBlock Text="Info" />
+        </StackPanel>
+      </TabItem.Header>
+      <views:InfoView />
+    </TabItem>
+
+  </TabControl>
+
+</UserControl>

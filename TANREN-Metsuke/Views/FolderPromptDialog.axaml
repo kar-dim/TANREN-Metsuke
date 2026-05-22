@@ -1,0 +1,50 @@
+﻿<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+        x:Class="TANREN_Metsuke.Views.NoWorkoutsDialog"
+        Title="TANREN Metsuke"
+        Width="440" Height="230"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#0D0D1F"
+        ShowInTaskbar="False">
+
+    <Border Padding="32,28,32,24">
+        <StackPanel Spacing="16">
+
+            <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                <materialIcons:MaterialIcon Kind="QrcodeScan"
+                                            Width="36" Height="36"
+                                            Foreground="#29B6F6"/>
+                <TextBlock Text="No workout data found"
+                           FontSize="17"
+                           Foreground="#C0C8D8"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <TextBlock TextWrapping="Wrap"
+                       FontSize="14"
+                       Foreground="#9E9E9E"
+                       Text="Sync your workouts from TANREN Kiroku on your phone to get started. Go to the Sync tab to display the QR code."/>
+
+            <StackPanel Orientation="Horizontal" Spacing="10"
+                        HorizontalAlignment="Right" Margin="0,6,0,0">
+                <Button Content="Later"
+                        Padding="16,7"
+                        Background="Transparent"
+                        Foreground="#9E9E9E"
+                        BorderBrush="#2A2A4A" BorderThickness="1"
+                        CornerRadius="6" Cursor="Hand"
+                        Click="LaterButton_Click"/>
+                <Button Content="Go to Sync"
+                        Padding="16,7"
+                        Background="#29B6F6"
+                        Foreground="#07071A"
+                        BorderThickness="0"
+                        CornerRadius="6" Cursor="Hand"
+                        Click="SyncButton_Click"/>
+            </StackPanel>
+
+        </StackPanel>
+    </Border>
+</Window>

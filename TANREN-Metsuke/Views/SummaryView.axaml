@@ -1,0 +1,119 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:TANREN_Metsuke.ViewModels"
+             x:Class="TANREN_Metsuke.Views.SummaryView"
+             x:DataType="vm:SummaryViewModel">
+
+  <Grid RowDefinitions="Auto,*,Auto" Margin="20">
+
+    <!-- Header -->
+    <TextBlock x:Name="StatsText" Grid.Row="0"
+               FontSize="16" Foreground="{StaticResource TextDim}"
+               HorizontalAlignment="Center" VerticalAlignment="Center"
+               Margin="0,0,0,10"/>
+
+    <!-- Body viewbox, right margin animates open when detail panel shows -->
+    <Viewbox x:Name="BodyViewbox" Grid.Row="1" Stretch="Uniform" StretchDirection="Both">
+      <Grid Width="1000" Height="1000">
+        <Image Source="/Assets/body.png" Stretch="Fill" IsHitTestVisible="False" />
+        <Canvas x:Name="OverlayCanvas" Width="1000" Height="1000" />
+      </Grid>
+    </Viewbox>
+
+    <!-- Detail panel, slides from right, starts at Width=0 -->
+    <Border x:Name="DetailPanel" Grid.Row="1"
+            HorizontalAlignment="Right" Width="0"
+            Background="{StaticResource SurfaceBg}" CornerRadius="8,0,0,8"
+            ClipToBounds="True">
+      <Grid RowDefinitions="Auto,*" Margin="20,16,20,16">
+
+        <!-- Detail header -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+          <StackPanel Grid.Column="0">
+            <TextBlock x:Name="DetailTitle" FontSize="17" FontWeight="Bold" TextWrapping="Wrap" />
+            <TextBlock x:Name="DetailVolume" FontSize="12" Foreground="{StaticResource TextDim}" Margin="0,4,0,0" />
+          </StackPanel>
+          <Button x:Name="CloseDetailBtn" Grid.Column="1"
+                  Content="✕" FontSize="15"
+                  Background="Transparent" Foreground="{StaticResource TextFaint}"
+                  BorderThickness="0" Padding="8,4"
+                  VerticalAlignment="Top" Cursor="Hand"/>
+        </Grid>
+
+        <!-- Workout day list -->
+        <ScrollViewer Grid.Row="1">
+          <ItemsControl x:Name="DetailDaysList">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:WorkoutDayGroup">
+                <StackPanel Margin="0,0,0,14">
+                  <Border Background="{StaticResource CardAltBg}" CornerRadius="4" Padding="8,4" Margin="0,0,0,4">
+                    <TextBlock Text="{Binding DateText}" FontWeight="SemiBold" FontSize="13" />
+                  </Border>
+                  <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                VerticalScrollBarVisibility="Disabled"
+                                Margin="6,0,0,0">
+                  <ItemsControl ItemsSource="{Binding Exercises}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="20"/>
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ExerciseRow">
+                        <StackPanel Margin="0,4,0,0" Spacing="2" MinWidth="160">
+                          <TextBlock Text="{Binding Display}" FontWeight="SemiBold" FontSize="12"
+                                     FontFamily="{StaticResource OxaniumFont}"
+                                     Foreground="{StaticResource AccentBrush}"
+                                     IsVisible="{Binding IsPrimary}"/>
+                          <TextBlock Text="{Binding Display}" FontWeight="SemiBold" FontSize="12"
+                                     FontFamily="{StaticResource OxaniumFont}"
+                                     Foreground="{StaticResource SecondaryBrush}"
+                                     IsVisible="{Binding !IsPrimary}"/>
+                          <ItemsControl ItemsSource="{Binding Sets}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:WorkoutSetRow">
+                                <Grid ColumnDefinitions="52,36,16,*" Margin="0,1">
+                                  <TextBlock Grid.Column="0" Text="{Binding SetLabel}"
+                                             FontFamily="{StaticResource MonoFont}"
+                                             FontSize="13" Foreground="{StaticResource TextMuted}"/>
+                                  <TextBlock Grid.Column="1" Text="{Binding Reps}"
+                                             FontFamily="{StaticResource MonoFont}"
+                                             FontSize="13" Foreground="{StaticResource TextMuted}"
+                                             HorizontalAlignment="Right"/>
+                                  <TextBlock Grid.Column="2" Text="×"
+                                             FontFamily="{StaticResource MonoFont}"
+                                             FontSize="13" Foreground="{StaticResource TextCaption}"
+                                             HorizontalAlignment="Center"/>
+                                  <TextBlock Grid.Column="3" Text="{Binding Kg}"
+                                             FontFamily="{StaticResource MonoFont}"
+                                             FontSize="13" Foreground="{StaticResource TextMuted}"/>
+                                </Grid>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  </ScrollViewer>
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+
+      </Grid>
+    </Border>
+
+    <!-- Hover info bar -->
+    <Border Grid.Row="2" Background="{StaticResource ItemBg}" CornerRadius="6"
+            Padding="12,8" Margin="0,10,0,0"
+            HorizontalAlignment="Center" MinWidth="400">
+      <TextBlock x:Name="HoverInfo"
+                 Text="Hover over a muscle group for details (click to see history)"
+                 FontSize="13" Foreground="{StaticResource TextSubtle}"
+                 HorizontalAlignment="Center" />
+    </Border>
+
+  </Grid>
+</UserControl>

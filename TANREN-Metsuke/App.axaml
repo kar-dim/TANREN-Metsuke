@@ -1,0 +1,120 @@
+﻿<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="TANREN_Metsuke.App"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             RequestedThemeVariant="Dark">
+
+    <Application.Resources>
+        <FontFamily x:Key="OxaniumFont">avares://TANREN-Metsuke/Assets/fonts#Oxanium</FontFamily>
+        <FontFamily x:Key="MonoFont">avares://TANREN-Metsuke/Assets/fonts#Inconsolata</FontFamily>
+
+        <!-- Accent -->
+        <Color x:Key="AccentColor">#29B6F6</Color>
+        <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}"/>
+        <SolidColorBrush x:Key="AccentMuted" Color="#7BB8CC"/>
+        <SolidColorBrush x:Key="SecondaryBrush" Color="#FFD54F"/>
+
+        <!-- Surfaces -->
+        <SolidColorBrush x:Key="SidebarBg" Color="#07071A"/>
+        <SolidColorBrush x:Key="SurfaceBg" Color="#0D0D1F"/>
+        <SolidColorBrush x:Key="CardBg" Color="#0D1526"/>
+        <SolidColorBrush x:Key="CardAltBg" Color="#2A2A3E"/>
+        <SolidColorBrush x:Key="ItemBg" Color="#1A1A2E"/>
+        <SolidColorBrush x:Key="HoverBg" Color="#08081A"/>
+        <SolidColorBrush x:Key="PressedBg" Color="#060612"/>
+        <SolidColorBrush x:Key="DividerBrush" Color="#1C1C38"/>
+
+        <!-- Text -->
+        <SolidColorBrush x:Key="TextPrimary" Color="#C0C8D8"/>
+        <SolidColorBrush x:Key="TextSecondary" Color="#CFD8E8"/>
+        <SolidColorBrush x:Key="TextMuted" Color="#9E9E9E"/>
+        <SolidColorBrush x:Key="TextDim" Color="#999999"/>
+        <SolidColorBrush x:Key="TextFaint" Color="#888888"/>
+        <SolidColorBrush x:Key="TextSubtle" Color="#AAAAAA"/>
+        <SolidColorBrush x:Key="TextCaption" Color="#606880"/>
+        <SolidColorBrush x:Key="TextPlaceholder" Color="#424260"/>
+        <SolidColorBrush x:Key="TextHover" Color="#E0E0E0"/>
+    </Application.Resources>
+
+    <Application.Styles>
+        <materialIcons:MaterialIconStyles />
+        <FluentTheme />
+        <Style Selector="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource OxaniumFont}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="FontFamily" Value="{StaticResource OxaniumFont}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button">
+            <Setter Property="FontFamily" Value="{StaticResource OxaniumFont}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <!-- TabItem custom template: left line on selected -->
+        <Style Selector="TabItem">
+            <Setter Property="Padding" Value="16,14,20,14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Grid ColumnDefinitions="3,*">
+                        <Border Grid.Column="0" x:Name="LeftIndicator" Background="Transparent"/>
+                        <Border Grid.Column="1" x:Name="PART_LayoutRoot"
+                                Background="Transparent"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter x:Name="PART_ContentPresenter"
+                                              ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                              Content="{TemplateBinding Header}"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="TabItem:selected /template/ Border#LeftIndicator">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+        </Style>
+        <Style Selector="TabItem:selected /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="{StaticResource CardBg}"/>
+        </Style>
+        <Style Selector="TabItem:pointerover /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="{StaticResource HoverBg}"/>
+        </Style>
+        <Style Selector="TabItem:pressed /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="{StaticResource PressedBg}"/>
+        </Style>
+
+        <!-- Tab icon states -->
+        <Style Selector="TabItem materialIcons|MaterialIcon">
+            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+        </Style>
+        <Style Selector="TabItem:pointerover materialIcons|MaterialIcon">
+            <Setter Property="Foreground" Value="{StaticResource TextHover}"/>
+        </Style>
+        <Style Selector="TabItem:selected materialIcons|MaterialIcon">
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+        </Style>
+        <Style Selector="TabItem:pressed materialIcons|MaterialIcon">
+            <Setter Property="Foreground" Value="{StaticResource AccentMuted}"/>
+        </Style>
+
+        <!-- Tab label text -->
+        <Style Selector="TabItem StackPanel > TextBlock">
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+        </Style>
+        <Style Selector="TabItem:pointerover StackPanel > TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextHover}"/>
+        </Style>
+        <Style Selector="TabItem:selected StackPanel > TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+        </Style>
+    </Application.Styles>
+</Application>

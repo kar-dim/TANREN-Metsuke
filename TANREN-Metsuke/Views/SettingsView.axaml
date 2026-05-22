@@ -1,0 +1,154 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:TANREN_Metsuke.ViewModels"
+             x:Class="TANREN_Metsuke.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+  <UserControl.Styles>
+
+    <Style Selector="RadioButton.opt-btn">
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Padding" Value="14,6"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="FontFamily" Value="{StaticResource OxaniumFont}"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter Content="{TemplateBinding Content}"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="RadioButton.opt-btn:checked">
+      <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+      <Setter Property="Foreground" Value="#07071A"/>
+    </Style>
+    <Style Selector="RadioButton.opt-btn:pointerover">
+      <Setter Property="Background" Value="{StaticResource HoverBg}"/>
+      <Setter Property="Foreground" Value="{StaticResource TextHover}"/>
+    </Style>
+    <Style Selector="RadioButton.opt-btn:checked:pointerover">
+      <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+      <Setter Property="Foreground" Value="#07071A"/>
+    </Style>
+
+  </UserControl.Styles>
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="32,28" Spacing="20" MaxWidth="640" HorizontalAlignment="Center">
+
+      <!-- Page title -->
+      <TextBlock Text="Settings"
+                 FontSize="22" FontWeight="Bold"
+                 Foreground="{StaticResource TextPrimary}"
+                 Margin="0,0,0,4"/>
+
+      <!-- Unit system -->
+      <Border Background="{StaticResource CardBg}"
+              BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+              CornerRadius="10" Padding="20,18">
+        <StackPanel Spacing="16">
+
+          <TextBlock Text="Unit system"
+                     FontSize="16" FontWeight="Bold"
+                     Foreground="{StaticResource AccentBrush}"/>
+
+          <TextBlock TextWrapping="Wrap" FontSize="13"
+                     Foreground="{StaticResource TextMuted}"
+                     Text="Choose whether weights are displayed in kilograms or pounds."/>
+
+          <Border Background="{StaticResource SidebarBg}"
+                  BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+                  CornerRadius="8" Padding="4" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="2">
+              <RadioButton Classes="opt-btn" Content="kg" GroupName="Unit"
+                           IsChecked="{Binding IsKg, Mode=TwoWay}"/>
+              <RadioButton Classes="opt-btn" Content="lb" GroupName="Unit"
+                           IsChecked="{Binding IsLb, Mode=TwoWay}"/>
+            </StackPanel>
+          </Border>
+
+        </StackPanel>
+      </Border>
+
+      <!-- Volume calculation -->
+      <Border Background="{StaticResource CardBg}"
+              BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+              CornerRadius="10" Padding="20,18">
+        <StackPanel Spacing="16">
+
+          <TextBlock Text="Volume calculation"
+                     FontSize="16" FontWeight="Bold"
+                     Foreground="{StaticResource AccentBrush}"/>
+
+          <TextBlock TextWrapping="Wrap" FontSize="13"
+                     Foreground="{StaticResource TextMuted}"
+                     Text="Most exercises work a primary muscle group and one or more secondary ones. Choose how much secondary muscles count toward your total volume and the heatmap."/>
+
+          <!-- Volume calculation radio buttons -->
+          <Border Background="{StaticResource SidebarBg}"
+                  BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+                  CornerRadius="8" Padding="4" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="2">
+              <RadioButton Classes="opt-btn" Content="Full" GroupName="Secondary"
+                           IsChecked="{Binding IsSecondaryFull, Mode=TwoWay}"/>
+              <RadioButton Classes="opt-btn" Content="50%" GroupName="Secondary"
+                           IsChecked="{Binding IsSecondaryHalf, Mode=TwoWay}"/>
+              <RadioButton Classes="opt-btn" Content="Off" GroupName="Secondary"
+                           IsChecked="{Binding IsSecondaryOff, Mode=TwoWay}"/>
+            </StackPanel>
+          </Border>
+
+          <!-- Option descriptions -->
+          <StackPanel Spacing="10">
+
+            <Border Background="{StaticResource ItemBg}" CornerRadius="6" Padding="14,10">
+              <Grid ColumnDefinitions="56,*" ColumnSpacing="12">
+                <TextBlock Grid.Column="0" Text="Full"
+                           FontWeight="Bold" FontSize="13"
+                           Foreground="{StaticResource AccentBrush}"
+                           VerticalAlignment="Top"/>
+                <TextBlock Grid.Column="1" TextWrapping="Wrap" FontSize="13"
+                           Foreground="{StaticResource TextMuted}"
+                           Text="Secondary muscles count at 100%. A bench press contributes the same to both chest (primary) and triceps (secondary). Use this if you want the most inclusive picture of total work done."/>
+              </Grid>
+            </Border>
+
+            <Border Background="{StaticResource ItemBg}" CornerRadius="6" Padding="14,10">
+              <Grid ColumnDefinitions="56,*" ColumnSpacing="12">
+                <TextBlock Grid.Column="0" Text="50%"
+                           FontWeight="Bold" FontSize="13"
+                           Foreground="{StaticResource AccentBrush}"
+                           VerticalAlignment="Top"/>
+                <TextBlock Grid.Column="1" TextWrapping="Wrap" FontSize="13"
+                           Foreground="{StaticResource TextMuted}"
+                           Text="Secondary muscles count at half the volume of the primary. A balanced default, it acknowledges that secondary muscles contribute, but are not the main target of the exercise."/>
+              </Grid>
+            </Border>
+
+            <Border Background="{StaticResource ItemBg}" CornerRadius="6" Padding="14,10">
+              <Grid ColumnDefinitions="56,*" ColumnSpacing="12">
+                <TextBlock Grid.Column="0" Text="Off"
+                           FontWeight="Bold" FontSize="13"
+                           Foreground="{StaticResource AccentBrush}"
+                           VerticalAlignment="Top"/>
+                <TextBlock Grid.Column="1" TextWrapping="Wrap" FontSize="13"
+                           Foreground="{StaticResource TextMuted}"
+                           Text="Only primary muscles are counted. The heatmap and volume totals reflect exclusively the muscle group each exercise was programmed for. Best for strict tracking of direct work per muscle."/>
+              </Grid>
+            </Border>
+
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+
+</UserControl>

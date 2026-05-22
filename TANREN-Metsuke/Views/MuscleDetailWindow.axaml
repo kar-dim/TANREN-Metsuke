@@ -1,0 +1,80 @@
+﻿<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:TANREN_Metsuke.ViewModels"
+        x:Class="TANREN_Metsuke.Views.MuscleDetailWindow"
+        x:DataType="vm:MuscleDetailViewModel"
+        Title="{Binding Title}"
+        WindowStartupLocation="CenterOwner">
+
+  <Grid RowDefinitions="Auto,*" Margin="16">
+
+    <!-- Header -->
+    <StackPanel Grid.Row="0" Margin="0,0,0,12">
+      <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="Bold" />
+      <TextBlock Text="{Binding TotalVolumeDisplay}" FontSize="13" Foreground="{StaticResource TextDim}" Margin="0,4,0,0" />
+    </StackPanel>
+
+    <!-- Workout list -->
+    <ScrollViewer Grid.Row="1">
+      <ItemsControl ItemsSource="{Binding Days}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:WorkoutDayGroup">
+            <StackPanel Margin="0,0,0,14">
+              <Border Background="{StaticResource CardAltBg}" CornerRadius="4" Padding="8,4" Margin="0,0,0,4">
+                <TextBlock Text="{Binding DateText}" FontWeight="SemiBold" FontSize="14" />
+              </Border>
+              <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                            VerticalScrollBarVisibility="Disabled"
+                            Margin="6,0,0,0">
+              <ItemsControl ItemsSource="{Binding Exercises}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="20"/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ExerciseRow">
+                    <StackPanel Margin="0,4,0,0" Spacing="2" MinWidth="170">
+                      <TextBlock Text="{Binding Display}" FontWeight="SemiBold" FontSize="13"
+                                 FontFamily="{StaticResource OxaniumFont}"
+                                 Foreground="{StaticResource AccentBrush}"
+                                 IsVisible="{Binding IsPrimary}"/>
+                      <TextBlock Text="{Binding Display}" FontWeight="SemiBold" FontSize="13"
+                                 FontFamily="{StaticResource OxaniumFont}"
+                                 Foreground="{StaticResource SecondaryBrush}"
+                                 IsVisible="{Binding !IsPrimary}"/>
+                      <ItemsControl ItemsSource="{Binding Sets}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:WorkoutSetRow">
+                            <Grid ColumnDefinitions="52,36,16,*" Margin="0,1">
+                              <TextBlock Grid.Column="0" Text="{Binding SetLabel}"
+                                         FontFamily="{StaticResource MonoFont}"
+                                         FontSize="14" Foreground="{StaticResource TextMuted}"/>
+                              <TextBlock Grid.Column="1" Text="{Binding Reps}"
+                                         FontFamily="{StaticResource MonoFont}"
+                                         FontSize="14" Foreground="{StaticResource TextMuted}"
+                                         HorizontalAlignment="Right"/>
+                              <TextBlock Grid.Column="2" Text="×"
+                                         FontFamily="{StaticResource MonoFont}"
+                                         FontSize="14" Foreground="{StaticResource TextCaption}"
+                                         HorizontalAlignment="Center"/>
+                              <TextBlock Grid.Column="3" Text="{Binding Kg}"
+                                         FontFamily="{StaticResource MonoFont}"
+                                         FontSize="14" Foreground="{StaticResource TextMuted}"/>
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              </ScrollViewer>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+  </Grid>
+</Window>

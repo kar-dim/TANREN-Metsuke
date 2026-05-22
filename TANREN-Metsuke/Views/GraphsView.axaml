@@ -1,0 +1,230 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:TANREN_Metsuke.ViewModels"
+             xmlns:lvc="using:LiveChartsCore.SkiaSharpView.Avalonia"
+             x:Class="TANREN_Metsuke.Views.GraphsView"
+             x:DataType="vm:GraphsViewModel"
+             x:CompileBindings="False">
+
+  <UserControl.Styles>
+    <!-- Inner chart tabs, horizontal with bottom line -->
+    <Style Selector="TabControl.chart-tabs TabItem">
+      <Setter Property="Padding" Value="24,10,24,8"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FontFamily" Value="{StaticResource OxaniumFont}"/>
+      <Setter Property="FontSize" Value="22"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Grid RowDefinitions="*,2">
+            <Border Grid.Row="0" x:Name="PART_LayoutRoot" Background="Transparent"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter x:Name="PART_ContentPresenter"
+                                Content="{TemplateBinding Header}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"/>
+            </Border>
+            <Border Grid.Row="1" x:Name="BottomIndicator" Background="Transparent"/>
+          </Grid>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="TabControl.chart-tabs TabItem:selected /template/ Border#BottomIndicator">
+      <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+    </Style>
+    <Style Selector="TabControl.chart-tabs TabItem:pointerover /template/ Border#PART_LayoutRoot">
+      <Setter Property="Background" Value="{StaticResource HoverBg}"/>
+    </Style>
+    <Style Selector="TabControl.chart-tabs TabItem:selected">
+      <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+    </Style>
+    <Style Selector="TabControl.chart-tabs TabItem:pointerover">
+      <Setter Property="Foreground" Value="{StaticResource TextHover}"/>
+    </Style>
+
+    <!-- Range radio buttons -->
+    <Style Selector="RadioButton.range-btn">
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Padding" Value="12,5"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="FontFamily" Value="{StaticResource OxaniumFont}"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter Content="{TemplateBinding Content}"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"/>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="RadioButton.range-btn:checked">
+      <Setter Property="Background" Value="{StaticResource CardBg}"/>
+      <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+    </Style>
+    <Style Selector="RadioButton.range-btn:pointerover">
+      <Setter Property="Background" Value="{StaticResource HoverBg}"/>
+      <Setter Property="Foreground" Value="{StaticResource TextHover}"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,*">
+
+    <!-- Range selector (dates) -->
+    <Border Grid.Row="0" Margin="20,14,20,0" Padding="4"
+            Background="{StaticResource SidebarBg}"
+            BorderBrush="{StaticResource DividerBrush}"
+            BorderThickness="1" CornerRadius="8">
+      <StackPanel Orientation="Horizontal" Spacing="2">
+        <RadioButton Classes="range-btn" Content="7 days" IsChecked="{Binding IsRange7d, Mode=TwoWay}" GroupName="Range"/>
+        <RadioButton Classes="range-btn" Content="1 month" IsChecked="{Binding IsRange1m, Mode=TwoWay}" GroupName="Range"/>
+        <RadioButton Classes="range-btn" Content="3 months" IsChecked="{Binding IsRange3m, Mode=TwoWay}" GroupName="Range"/>
+        <RadioButton Classes="range-btn" Content="6 months" IsChecked="{Binding IsRange6m, Mode=TwoWay}" GroupName="Range"/>
+        <RadioButton Classes="range-btn" Content="All time" IsChecked="{Binding IsRangeAll, Mode=TwoWay}" GroupName="Range"/>
+      </StackPanel>
+    </Border>
+
+    <TabControl Grid.Row="1" Classes="chart-tabs" Padding="0" TabStripPlacement="Top" Margin="0,10,0,0">
+
+      <!-- Muscle Radar -->
+      <TabItem Header="Muscle Radar">
+        <Panel Margin="20,14,20,16">
+          <lvc:PolarChart Series="{Binding RadarSeries}"
+                          AngleAxes="{Binding RadarAngleAxes}"
+                          RadiusAxes="{Binding RadarRadiusAxes}"
+                          LegendPosition="Hidden"
+                          Background="Transparent" />
+
+          <!-- Legend -->
+          <StackPanel IsVisible="{Binding HasRadarData}"
+                      HorizontalAlignment="Right" VerticalAlignment="Top"
+                      Margin="0,6,6,0" Spacing="6">
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+              <Ellipse Width="15" Height="15" Fill="#29B6F6"/>
+              <TextBlock Text="Primary" FontFamily="{StaticResource OxaniumFont}"
+                         FontSize="18" Foreground="{StaticResource TextMuted}"
+                         VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel IsVisible="{Binding HasSecondary}" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+              <Ellipse Width="15" Height="15" Fill="#FFD54F"/>
+              <TextBlock Text="With Secondary" FontFamily="{StaticResource OxaniumFont}"
+                         FontSize="18" Foreground="{StaticResource TextMuted}"
+                         VerticalAlignment="Center"/>
+            </StackPanel>
+          </StackPanel>
+
+          <Border IsVisible="{Binding !HasRadarData}"
+                  HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+            <TextBlock Text="No workout sessions in the selected period."
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       FontFamily="{StaticResource OxaniumFont}"
+                       FontSize="16" Foreground="{StaticResource TextMuted}"/>
+          </Border>
+        </Panel>
+      </TabItem>
+
+      <!-- By Exercise -->
+      <TabItem Header="By Exercise">
+        <Grid RowDefinitions="Auto,*" Margin="20,14,20,16">
+
+          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="20"
+                      VerticalAlignment="Center" Margin="0,0,0,12">
+
+            <ComboBox ItemsSource="{Binding AvailableExercises}"
+                      SelectedItem="{Binding SelectedExercise}"
+                      MinWidth="210">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:CompileBindings="False">
+                  <TextBlock Text="{Binding Name}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <StackPanel Orientation="Horizontal" Spacing="20" VerticalAlignment="Center">
+              <RadioButton Content="Max Weight" IsChecked="{Binding IsMaxWeight, Mode=TwoWay}" FontFamily="{StaticResource OxaniumFont}" FontSize="13" />
+              <RadioButton Content="Max Reps" IsChecked="{Binding IsMaxReps, Mode=TwoWay}" FontFamily="{StaticResource OxaniumFont}" FontSize="13" />
+              <RadioButton Content="Total Volume" IsChecked="{Binding IsVolume, Mode=TwoWay}" FontFamily="{StaticResource OxaniumFont}" FontSize="13" />
+            </StackPanel>
+
+          </StackPanel>
+
+          <Panel Grid.Row="1">
+            <lvc:CartesianChart Series="{Binding ExerciseSeries}"
+                                XAxes="{Binding ExerciseXAxes}"
+                                YAxes="{Binding ExerciseYAxes}"
+                                LegendPosition="Hidden"
+                                Background="Transparent" />
+
+            <Border IsVisible="{Binding !HasExerciseData}"
+                    HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+              <TextBlock Text="No data for this exercise in the selected period."
+                         HorizontalAlignment="Center" VerticalAlignment="Center"
+                         FontFamily="{StaticResource OxaniumFont}"
+                         FontSize="16" Foreground="{StaticResource TextMuted}"/>
+            </Border>
+          </Panel>
+
+        </Grid>
+      </TabItem>
+
+      <!-- By Workout -->
+      <TabItem Header="By Workout">
+        <Grid RowDefinitions="*,Auto" Margin="20,14,20,10">
+          <Panel Grid.Row="0">
+            <lvc:CartesianChart Series="{Binding WorkoutSeries}"
+                                XAxes="{Binding WorkoutXAxes}"
+                                YAxes="{Binding WorkoutYAxes}"
+                                LegendPosition="Hidden"
+                                Background="Transparent" />
+
+            <Border IsVisible="{Binding !HasWorkoutData}"
+                    HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+              <TextBlock Text="No workout sessions in the selected period."
+                         HorizontalAlignment="Center" VerticalAlignment="Center"
+                         FontFamily="{StaticResource OxaniumFont}"
+                         FontSize="16" Foreground="{StaticResource TextMuted}"/>
+            </Border>
+          </Panel>
+
+          <Border Grid.Row="1" IsVisible="{Binding HasWorkoutData}"
+                  Background="{StaticResource ItemBg}" CornerRadius="6"
+                  Padding="12,7" Margin="0,6,0,0"
+                  HorizontalAlignment="Center">
+            <TextBlock Text="Click a bar to view the full workout"
+                       FontFamily="{StaticResource OxaniumFont}"
+                       FontSize="13" Foreground="{StaticResource TextCaption}"/>
+          </Border>
+        </Grid>
+      </TabItem>
+
+      <!-- Weekly -->
+      <TabItem Header="Weekly">
+        <Grid RowDefinitions="*" Margin="20,14,20,16">
+          <Panel>
+            <lvc:CartesianChart Series="{Binding WeeklySeries}"
+                                XAxes="{Binding WeeklyXAxes}"
+                                YAxes="{Binding WeeklyYAxes}"
+                                LegendPosition="Hidden"
+                                Background="Transparent" />
+
+            <Border IsVisible="{Binding !HasWeeklyData}"
+                    HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+              <TextBlock Text="No workout sessions in the selected period."
+                         HorizontalAlignment="Center" VerticalAlignment="Center"
+                         FontFamily="{StaticResource OxaniumFont}"
+                         FontSize="16" Foreground="{StaticResource TextMuted}"/>
+            </Border>
+          </Panel>
+        </Grid>
+      </TabItem>
+
+    </TabControl>
+  </Grid>
+
+</UserControl>

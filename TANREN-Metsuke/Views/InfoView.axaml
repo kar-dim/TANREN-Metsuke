@@ -1,0 +1,64 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="TANREN_Metsuke.Views.InfoView">
+
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel MaxWidth="680" HorizontalAlignment="Center"
+                Margin="40,30,40,40" Spacing="20">
+
+      <!-- TANREN main logo (image) -->
+      <Image HorizontalAlignment="Center" Source="/Assets/tanren.png"
+             MaxWidth="256" MaxHeight="256" Stretch="Uniform" />
+
+      <!-- TANREN kanji block -->
+      <Border Background="{StaticResource CardBg}" CornerRadius="10" Padding="20,16">
+        <StackPanel Spacing="8">
+          <TextBlock TextWrapping="Wrap" FontSize="15" FontStyle="Italic" Foreground="{StaticResource TextSecondary}"
+                     Text="Tan - &quot;To improve the quality of metal by hitting it from top to bottom.&quot;" />
+          <TextBlock TextWrapping="Wrap" FontSize="15" FontStyle="Italic" Foreground="{StaticResource TextSecondary}"
+                     Text="Ren - &quot;To improve the quality of metal by melting it and separating impure substances.&quot;" />
+          <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextCaption}" Margin="0,6,0,0"
+                     Text="From Kanjigen, 5th Revision. Translated by Masahiro Imafuji." />
+        </StackPanel>
+      </Border>
+
+      <!-- Section: The Forge -->
+      <TextBlock Text="The Forge" FontSize="20" FontWeight="SemiBold"
+                 Foreground="{StaticResource AccentBrush}" />
+      <TextBlock TextWrapping="Wrap" FontSize="16" Foreground="{StaticResource TextPrimary}" LineHeight="28"
+                 Text="Together, these two characters describe an ancient forging process: heat iron, hammer it, fold it, repeat. A master swordsmith selects iron of varying carbon purity, works it through fire and force, and through sustained effort removes every impurity. What remains is a nihonto, a true Japanese blade, unbreakable precisely because it has been broken down and rebuilt." />
+
+      <!-- Section: Self improvement -->
+      <TextBlock Text="Tanren Is a Process of Self-Improvement" FontSize="20" FontWeight="SemiBold"
+                 Foreground="{StaticResource AccentBrush}" />
+      <TextBlock TextWrapping="Wrap" FontSize="16" Foreground="{StaticResource TextPrimary}" LineHeight="28"
+                 Text="The forge is a metaphor. Before the hammer can do its work, impurities must first be identified and removed, and in human terms, that means letting go of preconceived ideas about what training should look like. Not all effort qualifies as tanren. Only training that demands genuine, sustained exertion carries that name." />
+      <TextBlock TextWrapping="Wrap" FontSize="16" Foreground="{StaticResource TextPrimary}" LineHeight="28"
+                 Text="&quot;Practice makes perfect&quot; is a comfortable myth. Only perfect practice makes perfect. Drilling without awareness simply reinforces what already exists, flaws included. To truly refine something, you must first know enough about it to recognise when it is wrong." />
+
+      <!-- Section: The Spiritual Forge -->
+      <TextBlock Text="The Spiritual Forge" FontSize="20" FontWeight="SemiBold"
+                 Foreground="{StaticResource AccentBrush}" />
+      <TextBlock TextWrapping="Wrap" FontSize="16" Foreground="{StaticResource TextPrimary}" LineHeight="28"
+                 Text="In budo, the ultimate goal of physical training is not physical at all. The punishing ordeal of repetition is not designed to sharpen the body, but to help the practitioner transcend it. Thousands of repetitions numb the analytical mind and free it from self-absorption." />
+      <TextBlock TextWrapping="Wrap" FontSize="16" Foreground="{StaticResource TextPrimary}" LineHeight="28"
+                 Text="Technique alone is inert. Theory alone is inert. United through the heat of real effort, they become something alive. As experience grows, so does discernment: you begin to see more clearly what must be refined, and exactly how. The forge never truly ends." />
+
+      <!-- Section: Your Gym, Your Forge -->
+      <TextBlock Text="Your Gym, Your Forge" FontSize="20" FontWeight="SemiBold"
+                 Foreground="{StaticResource AccentBrush}" />
+      <TextBlock TextWrapping="Wrap" FontSize="16" Foreground="{StaticResource TextPrimary}" LineHeight="28"
+                 Text="Every set you complete is a hammer strike. Every rep under load, every session you show up for when you would rather not, is the fire. The gym is a forge, and your body and mind are the metal being worked. Tanren is not a metaphor borrowed for inspiration, it is exactly what happens when you train with awareness and intent, week after week, year after year." />
+      <TextBlock TextWrapping="Wrap" FontSize="16" Foreground="{StaticResource TextPrimary}" LineHeight="28"
+                 Text="This app exists to give that process a mirror. Tracking your sessions is not bureaucracy, it is discernment. Seeing which muscles you neglect, which lifts have stalled, which weeks you disappeared, is how you identify the impurities. You cannot refine what you cannot see. TANREN Metsuke is your EYE on the forge." />
+
+      <!-- Copyright -->
+      <TextBlock Text="© 2026 Dimitris Karatzas | TANREN Metsuke"
+                 FontSize="15" Foreground="White"
+                 HorizontalAlignment="Center"
+                 Margin="0,16,0,0" />
+
+    </StackPanel>
+  </ScrollViewer>
+
+</UserControl>
