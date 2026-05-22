@@ -53,7 +53,7 @@
                  Text="This app exists to give that process a mirror. Tracking your sessions is not bureaucracy, it is discernment. Seeing which muscles you neglect, which lifts have stalled, which weeks you disappeared, is how you identify the impurities. You cannot refine what you cannot see. TANREN Metsuke is your EYE on the forge." />
 
       <!-- Copyright -->
-      <TextBlock Text="© 2026 Dimitris Karatzas | TANREN Metsuke"
+      <TextBlock x:Name="CopyrightText"
                  FontSize="15" Foreground="White"
                  HorizontalAlignment="Center"
                  Margin="0,16,0,0" />
