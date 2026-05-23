@@ -25,6 +25,9 @@ public class SyncServer : IDisposable
 
     // workout JSON files are tiny, we cap the body to guard against a malformed or malicious Content-Length
     private const int MaxBodyBytes = 8 * 1024 * 1024;
+    // bound the request line, each header line, and the header count so a client cannot exhaust memory before the body is read
+    private const int MaxLineBytes = 8 * 1024;
+    private const int MaxHeaderCount = 100;
 
     private readonly TcpListener listener;
     private readonly string token;
@@ -102,8 +105,10 @@ public class SyncServer : IDisposable
                 return;
             }
 
-            var auth = headers.GetValueOrDefault("Authorization", "");
-            if (auth != $"Bearer {token}")
+            // constant time comparison to avoid side channel attacks (unlikely but let's be safe)
+            var expected = Encoding.UTF8.GetBytes($"Bearer {token}");
+            var provided = Encoding.UTF8.GetBytes(headers.GetValueOrDefault("Authorization", ""));
+            if (!CryptographicOperations.FixedTimeEquals(provided, expected))
             {
                 await SendResponseAsync(ssl, 401, new { error = "Unauthorized" }, ct);
                 return;
@@ -184,7 +189,8 @@ public class SyncServer : IDisposable
         }
 
         var safeName = Path.GetFileName(upload.Filename);
-        if (string.IsNullOrEmpty(safeName) || safeName != upload.Filename)
+        if (string.IsNullOrEmpty(safeName) || safeName != upload.Filename ||
+            !safeName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
         {
             await SendResponseAsync(stream, 400, new { error = "Invalid filename" }, ct);
             return;
@@ -221,6 +227,8 @@ public class SyncServer : IDisposable
             var line = await ReadLineAsync(stream, ct);
             if (line == "")
                 break;
+            if (headers.Count >= MaxHeaderCount)
+                throw new RequestTooLargeException();
             var colon = line.IndexOf(':');
             if (colon > 0)
                 headers[line[..colon].Trim()] = line[(colon + 1)..].Trim();
@@ -250,6 +258,8 @@ public class SyncServer : IDisposable
                 break;
             if (buf[0] != '\r')
                 sb.Append((char)buf[0]);
+            if (sb.Length > MaxLineBytes)
+                throw new RequestTooLargeException();
         }
         return sb.ToString();
     }

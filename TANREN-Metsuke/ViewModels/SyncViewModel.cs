@@ -1,7 +1,10 @@
 using System;
 using System.IO;
+using System.Linq;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -58,7 +61,7 @@ public class SyncViewModel : ViewModelBase
         try
         {
             var ip = DetectLocalIp();
-            var token = Guid.NewGuid().ToString("N")[..16];
+            var token = RandomNumberGenerator.GetHexString(32, lowercase: true); // 128-bit
             var cert = CertificateManager.LoadOrCreate();
             var fingerprint = CertificateManager.Fingerprint(cert);
 
@@ -97,30 +100,43 @@ public class SyncViewModel : ViewModelBase
 
     private static string DetectLocalIp()
     {
-        string? fallback = null;
+        // pick the physical LAN interface, not the default route or VPN interface
+        // first pass restricts to wired or wireless adapters, the second pass relaxes that so a real NIC
+        // reporting an unusual type is still found (NOTE: the gateway and subnet checks still exclude VPNs and virtual adapters)
+        return ScanForLan(requireKnownType: true) ?? ScanForLan(requireKnownType: false) ?? "127.0.0.1";
+    }
+
+    private static string? ScanForLan(bool requireKnownType)
+    {
         foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
         {
-            // ignore common virtual interfaces and loopback, and prefer LAN IPs in case of multiple addresses
             if (ni.OperationalStatus != OperationalStatus.Up)
                 continue;
-            if (ni.Name.StartsWith("vEthernet", StringComparison.OrdinalIgnoreCase))
+            if (requireKnownType && ni.NetworkInterfaceType is not (NetworkInterfaceType.Ethernet or NetworkInterfaceType.Wireless80211))
                 continue;
-            if (ni.Name.StartsWith("Loopback", StringComparison.OrdinalIgnoreCase))
+            var props = ni.GetIPProperties();
+            // virtual and host only adapters have no gateway
+            if (!props.GatewayAddresses.Any(g => g.Address.AddressFamily == AddressFamily.InterNetwork && !g.Address.Equals(IPAddress.Any)))
                 continue;
-
-            foreach (var addr in ni.GetIPProperties().UnicastAddresses)
+            foreach (var addr in props.UnicastAddresses)
             {
                 if (addr.Address.AddressFamily != AddressFamily.InterNetwork)
                     continue;
-                if (addr.PrefixLength >= 32) // may be a VPN tunnel
+                if (addr.PrefixLength is < 1 or > 30) // /32 has NO local subnet, mostly for WireGuard style VPN tunnels
                     continue;
-
-                var ip = addr.Address.ToString();
-                if (ip.StartsWith("192.168.")) // most probable to be the correct one local IP
-                    return ip;
-                fallback ??= ip;
+                if (IsUsableLan(addr.Address))
+                    return addr.Address.ToString();
             }
         }
-        return fallback ?? "127.0.0.1";
+        return null;
+    }
+
+    // private ranges, excluding APIPA (169.254) and loopback
+    private static bool IsUsableLan(IPAddress ip)
+    {
+        var b = ip.GetAddressBytes();
+        return b[0] == 10
+            || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
+            || (b[0] == 192 && b[1] == 168);
     }
 }
