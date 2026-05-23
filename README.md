@@ -12,15 +12,15 @@
 
 TANREN Metsuke is a Windows desktop app that reads workout data recorded by [TANREN Kiroku](https://github.com/kar-dim/TANREN-Kiroku) and turns it into charts, records, and a muscle heat map. No accounts, no cloud, no subscriptions.
 
-- **Home dashboard:** total workouts and lifetime volume at a glance, with an interactive body map colored by training volume per muscle group. Click any muscle region to open a history panel for that group
-- **By Exercise chart:** track max weight, max reps, or total volume over time for any exercise in your history
-- **By Workout chart:** bar chart of session volume across your timeline; click any bar to read the full workout breakdown
-- **Weekly chart:** aggregated volume per calendar week, showing training density over time
-- **Muscle Radar:** spider chart of set distribution across major muscle groups, with an optional secondary-muscle overlay to see full stimulus coverage
-- **Records:** personal bests per exercise, heaviest set, most reps, highest single-session volume
-- **Sync:** pair with TANREN Kiroku over local Wi-Fi via QR code. Transfer is TLS-encrypted and requires no internet connection
-- **Unit support:** switch between kg and lbs at any time
-- **Secondary muscle weight:** adjust how much secondary muscles contribute to volume calculations
+- **Home dashboard:** Total workouts and lifetime volume at a glance, with an interactive body map colored by training volume per muscle group. Click any muscle region to open a history panel for that group
+- **By Exercise chart:** Track max weight, max reps, or total volume over time for any exercise in your history
+- **By Workout chart:** Bar chart of session volume across your timeline, click any bar to read the full workout breakdown
+- **Weekly chart:** Aggregated volume per calendar week, showing training density over time
+- **Muscle Radar:** Spider chart of set distribution across major muscle groups, with an optional secondary muscle overlay to see full stimulus coverage
+- **Records:** Personal bests per exercise, heaviest set, most reps, and highest single session volume
+- **Sync:** Pair with TANREN Kiroku over local Wi-Fi via QR code. Transfer is TLS-encrypted and requires no internet connection (local network only)
+- **Unit support:** Switch between kg and lbs at any time
+- **Secondary muscle weight:** Adjust how much secondary muscles contribute to volume calculations
 
 ## Screenshots
 
