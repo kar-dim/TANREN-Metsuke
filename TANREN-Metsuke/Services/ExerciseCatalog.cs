@@ -730,7 +730,7 @@ public static class ExerciseCatalog
 
     public static IReadOnlyList<ExerciseDefinition> All => all;
 
-    // Loads custom exercises from a JSON file. If the file doesn't exist or is invalid, it falls back to the default exercises.
+    // loads custom exercises from a JSON file, if it doesn't exist or is invalid, it falls back to the default exercises only
     public static void LoadCustomExercises()
     {
         var path = Path.Combine(SettingsService.WorkoutsFolder, "custom_exercises.json");
