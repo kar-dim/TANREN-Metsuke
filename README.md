@@ -1,5 +1,7 @@
 # TANREN Metsuke
 
+![Status](https://img.shields.io/badge/status-alpha-orange)
+
 **TANREN** (鍛錬) is a Japanese concept meaning the forging and tempering of metal, the repeated, deliberate process that turns raw material into something refined. Applied to training, it describes what happens when you show up consistently, lift with awareness, and build on what came before. Not motivation. Not inspiration. Work, recorded and repeated.
 
 **Metsuke** (目付) means gaze, or the direction of the eye. In budo, it refers to the kind of focused awareness that sees everything without fixating on any single point. This app is the eye on your training history.
