@@ -10,6 +10,12 @@
     <ApplicationIcon>..\TANREN-Metsuke\Assets\metsuke.ico</ApplicationIcon>
   </PropertyGroup>
 
+  <!-- Do not generate debug symbols when publishing for release -->
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+	  <DebugSymbols>False</DebugSymbols>
+	  <DebugType>None</DebugType>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Avalonia.Desktop" Version="12.0.3" />
   </ItemGroup>
@@ -17,4 +23,12 @@
   <ItemGroup>
     <ProjectReference Include="..\TANREN-Metsuke\TANREN-Metsuke.csproj" />
   </ItemGroup>
+
+  <!-- Delete native library .pdb files that we cannot avoid generating-->
+  <Target Name="RemoveNativePdbs" AfterTargets="Publish" Condition="'$(Configuration)'=='Release'">
+    <ItemGroup>
+      <_PdbToDelete Include="$(PublishDir)**\*.pdb" />
+    </ItemGroup>
+    <Delete Files="@(_PdbToDelete)" />
+  </Target>
 </Project>

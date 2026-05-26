@@ -21,4 +21,9 @@
     <PackageReference Include="Material.Icons.Avalonia" Version="3.0.2" />
     <PackageReference Include="QRCoder" Version="1.6.0" />
   </ItemGroup>
+  <!-- Do not generate debug symbols when publishing for release -->
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+	  <DebugSymbols>False</DebugSymbols>
+	  <DebugType>None</DebugType>
+  </PropertyGroup>
 </Project>
