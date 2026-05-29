@@ -1,5 +1,6 @@
 using Avalonia.Media;
 using TANREN_Metsuke.Models;
+using TANREN_Metsuke.Theme;
 using TANREN_Metsuke.ViewModels;
 
 namespace TANREN_Metsuke.Views;
@@ -7,7 +8,7 @@ namespace TANREN_Metsuke.Views;
 public partial class RecordsView : BodyMapView
 {
     // accent cyan for muscles with records, gray for none
-    private static readonly Color AccentColor = Color.Parse("#29B6F6");
+    private static readonly Color AccentColor = Color.Parse(Palette.Accent);
 
     protected override byte HoverAlpha => 185;
 

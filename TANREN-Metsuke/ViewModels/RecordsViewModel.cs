@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using TANREN_Metsuke.Models;
 using TANREN_Metsuke.Services;
 
@@ -14,8 +15,12 @@ public class RecordsViewModel : ViewModelBase
     public RecordsViewModel(List<WorkoutSession> sessions, bool imperial = false)
     {
         records = PersonalRecordCalculator.Compute(sessions, imperial);
-        foreach (var list in records.Values)
-            TotalExercisesTracked += list.Count;
+        // an exercise can list several primary muscles, so we count distinct exercises to not count duplicates
+        TotalExercisesTracked = records.Values
+            .SelectMany(list => list)
+            .Select(pr => pr.ExerciseName)
+            .Distinct()
+            .Count();
     }
 
     public List<ExercisePersonalRecord> GetRecords(MuscleGroup muscle) => records.GetValueOrDefault(muscle) ?? [];

@@ -720,13 +720,11 @@ public static class ExerciseCatalog
             PrimaryMuscles = { MuscleGroup.Shins } },
     ];
 
-    private static readonly Dictionary<string, ExerciseDefinition> byId = exercises.ToDictionary(e => e.Id);
-    private static readonly JsonSerializerOptions jsonOptions = new() { PropertyNameCaseInsensitive = true };
-    private static List<ExerciseDefinition> customExercises = [];
+    private static readonly Dictionary<string, ExerciseDefinition> builtinById = exercises.ToDictionary(e => e.Id);
+    private static Dictionary<string, ExerciseDefinition> lookup = builtinById;
     private static IReadOnlyList<ExerciseDefinition> all = exercises;
 
-    public static ExerciseDefinition? Get(string id) =>
-        byId.GetValueOrDefault(id) ?? customExercises.FirstOrDefault(e => e.Id == id);
+    public static ExerciseDefinition? Get(string id) => lookup.GetValueOrDefault(id);
 
     public static IReadOnlyList<ExerciseDefinition> All => all;
 
@@ -734,29 +732,42 @@ public static class ExerciseCatalog
     public static void LoadCustomExercises()
     {
         var path = Path.Combine(SettingsService.WorkoutsFolder, "custom_exercises.json");
-        if (!File.Exists(path))
+        List<ExerciseDefinition> customExercises = [];
+        if (File.Exists(path))
         {
-            customExercises = [];
+            try
+            {
+                var json = File.ReadAllText(path);
+                var dtos = JsonSerializer.Deserialize<List<CustomExerciseDto>>(json, JsonDefaults.CaseInsensitive) ?? [];
+                customExercises = [.. dtos.Select(dto => new ExerciseDefinition
+                {
+                    Id = dto.Id,
+                    Name = dto.Name,
+                    PrimaryMuscles = [.. dto.PrimaryMuscles.Select(ParseMuscle).Where(m => m.HasValue).Select(m => m!.Value)],
+                    SecondaryMuscles = [.. dto.SecondaryMuscles.Select(ParseMuscle).Where(m => m.HasValue).Select(m => m!.Value)]
+                })];
+            }
+            catch
+            {
+                customExercises = [];
+            }
+        }
+
+        if (customExercises.Count == 0)
+        {
             all = exercises;
+            lookup = builtinById;
             return;
         }
-        try
-        {
-            var json = File.ReadAllText(path);
-            var dtos = JsonSerializer.Deserialize<List<CustomExerciseDto>>(json, jsonOptions) ?? [];
-            customExercises = [.. dtos.Select(dto => new ExerciseDefinition
-            {
-                Id = dto.Id,
-                Name = dto.Name,
-                PrimaryMuscles = [.. dto.PrimaryMuscles.Select(ParseMuscle).Where(m => m.HasValue).Select(m => m!.Value)],
-                SecondaryMuscles = [.. dto.SecondaryMuscles.Select(ParseMuscle).Where(m => m.HasValue).Select(m => m!.Value)]
-            })];
-        }
-        catch
-        {
-            customExercises = [];
-        }
-        all = customExercises.Count == 0 ? exercises : [.. exercises, .. customExercises];
+
+        all = [.. exercises, .. customExercises];
+        // we add customs first then builtins, so that a builtin id always wins on collision
+        var merged = new Dictionary<string, ExerciseDefinition>();
+        foreach (var e in customExercises)
+            merged[e.Id] = e;
+        foreach (var e in exercises)
+            merged[e.Id] = e;
+        lookup = merged;
     }
 
     private static MuscleGroup? ParseMuscle(string name) => Enum.TryParse<MuscleGroup>(name, true, out var g) ? g : null;

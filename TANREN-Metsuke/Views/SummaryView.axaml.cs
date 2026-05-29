@@ -4,17 +4,18 @@ using System.Linq;
 using Avalonia.Media;
 using TANREN_Metsuke.Models;
 using TANREN_Metsuke.Services;
+using TANREN_Metsuke.Theme;
 using TANREN_Metsuke.ViewModels;
 
 namespace TANREN_Metsuke.Views;
 
 public partial class SummaryView : BodyMapView
 {
-    private static readonly Color HeatGreen = Color.Parse("#4CAF50");
-    private static readonly Color HeatYellowGreen = Color.Parse("#8BC34A");
-    private static readonly Color HeatAmber = Color.Parse("#FFC107");
-    private static readonly Color HeatOrange = Color.Parse("#FF5722");
-    private static readonly Color HeatRed = Color.Parse("#F44336");
+    private static readonly Color HeatGreen = Color.Parse(Palette.HeatGreen);
+    private static readonly Color HeatYellowGreen = Color.Parse(Palette.HeatYellowGreen);
+    private static readonly Color HeatAmber = Color.Parse(Palette.HeatAmber);
+    private static readonly Color HeatOrange = Color.Parse(Palette.HeatOrange);
+    private static readonly Color HeatRed = Color.Parse(Palette.HeatRed);
 
     private SummaryViewModel? ViewModel => DataContext as SummaryViewModel;
 

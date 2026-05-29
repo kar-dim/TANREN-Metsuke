@@ -9,11 +9,6 @@ namespace TANREN_Metsuke.Services;
 // each file is expected to contain a single WorkoutSession object serialized as JSON
 public class JsonWorkoutRepository(string folder) : IWorkoutRepository
 {
-    private static readonly JsonSerializerOptions Options = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     public List<WorkoutSession> LoadAll()
     {
         List<WorkoutSession> sessions = [];
@@ -25,7 +20,7 @@ public class JsonWorkoutRepository(string folder) : IWorkoutRepository
             try
             {
                 string json = File.ReadAllText(file);
-                var session = JsonSerializer.Deserialize<WorkoutSession>(json, Options);
+                var session = JsonSerializer.Deserialize<WorkoutSession>(json, JsonDefaults.CaseInsensitive);
                 if (session != null)
                     sessions.Add(session);
             }

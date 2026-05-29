@@ -9,18 +9,22 @@ using LiveChartsCore.SkiaSharpView.Painting;
 using SkiaSharp;
 using TANREN_Metsuke.Models;
 using TANREN_Metsuke.Services;
+using TANREN_Metsuke.Theme;
 
 namespace TANREN_Metsuke.ViewModels;
+
+public enum ChartMetric { MaxWeight, MaxReps, Volume }
+public enum ChartRange { Week, Month, ThreeMonths, SixMonths, All }
 
 // View model for the graphs tab, responsible for preparing data and configuration for the various charts displayed in that tab
 public class GraphsViewModel : ViewModelBase
 {
-    private static readonly SKColor AccentColor = SKColor.Parse("#29B6F6");
-    private static readonly SKColor SecondaryColor = SKColor.Parse("#FFD54F");
-    private static readonly SKColor CardBg = SKColor.Parse("#0D1526");
-    private static readonly SKColor TextMuted = SKColor.Parse("#9E9E9E");
-    private static readonly SKColor TextCaption = SKColor.Parse("#606880");
-    private static readonly SKColor DividerBrush = SKColor.Parse("#1C1C38");
+    private static readonly SKColor AccentColor = SKColor.Parse(Palette.Accent);
+    private static readonly SKColor SecondaryColor = SKColor.Parse(Palette.Secondary);
+    private static readonly SKColor CardBg = SKColor.Parse(Palette.CardBg);
+    private static readonly SKColor TextMuted = SKColor.Parse(Palette.TextMuted);
+    private static readonly SKColor TextCaption = SKColor.Parse(Palette.TextCaption);
+    private static readonly SKColor DividerBrush = SKColor.Parse(Palette.Divider);
 
     private static readonly (string Label, MuscleGroup[] Muscles)[] RadarSpokes =
     [
@@ -37,21 +41,20 @@ public class GraphsViewModel : ViewModelBase
     private readonly Axis exerciseYAxis;
     private readonly bool imperial;
     private double secondaryWeight;
-    private int metric;
-    private int range = 1; // default is 1 month
+    private ChartMetric metric;
+    private ChartRange range = ChartRange.Month;
 
     public bool Imperial => imperial;
 
     public event Action<WorkoutSession>? WorkoutSessionClicked;
 
-    // range is 1 week, 1 month, 3 months, 6 months, or all time
-    public bool IsRange7d { get => range == 0; set { if (value) SetRange(0); } }
-    public bool IsRange1m { get => range == 1; set { if (value) SetRange(1); } }
-    public bool IsRange3m { get => range == 2; set { if (value) SetRange(2); } }
-    public bool IsRange6m { get => range == 3; set { if (value) SetRange(3); } }
-    public bool IsRangeAll { get => range == 4; set { if (value) SetRange(4); } }
+    public bool IsRange7d { get => range == ChartRange.Week; set { if (value) SetRange(ChartRange.Week); } }
+    public bool IsRange1m { get => range == ChartRange.Month; set { if (value) SetRange(ChartRange.Month); } }
+    public bool IsRange3m { get => range == ChartRange.ThreeMonths; set { if (value) SetRange(ChartRange.ThreeMonths); } }
+    public bool IsRange6m { get => range == ChartRange.SixMonths; set { if (value) SetRange(ChartRange.SixMonths); } }
+    public bool IsRangeAll { get => range == ChartRange.All; set { if (value) SetRange(ChartRange.All); } }
 
-    private void SetRange(int r)
+    private void SetRange(ChartRange r)
     {
         range = r;
         this.RaisePropertyChanged(nameof(IsRange7d));
@@ -70,10 +73,10 @@ public class GraphsViewModel : ViewModelBase
         var today = DateOnly.FromDateTime(DateTime.Today);
         var cutoff = range switch
         {
-            0 => today.AddDays(-7),
-            1 => today.AddMonths(-1),
-            2 => today.AddMonths(-3),
-            3 => today.AddMonths(-6),
+            ChartRange.Week => today.AddDays(-7),
+            ChartRange.Month => today.AddMonths(-1),
+            ChartRange.ThreeMonths => today.AddMonths(-3),
+            ChartRange.SixMonths => today.AddMonths(-6),
             _ => DateOnly.MinValue
         };
         return [.. sessions.Where(s => s.Date >= cutoff)];
@@ -89,11 +92,11 @@ public class GraphsViewModel : ViewModelBase
         set { this.RaiseAndSetIfChanged(ref selectedExercise, value); UpdateExerciseChart(); }
     }
 
-    public bool IsMaxWeight { get => metric == 0; set { if (value) SetMetric(0); } }
-    public bool IsMaxReps { get => metric == 1; set { if (value) SetMetric(1); } }
-    public bool IsVolume { get => metric == 2; set { if (value) SetMetric(2); } }
+    public bool IsMaxWeight { get => metric == ChartMetric.MaxWeight; set { if (value) SetMetric(ChartMetric.MaxWeight); } }
+    public bool IsMaxReps { get => metric == ChartMetric.MaxReps; set { if (value) SetMetric(ChartMetric.MaxReps); } }
+    public bool IsVolume { get => metric == ChartMetric.Volume; set { if (value) SetMetric(ChartMetric.Volume); } }
 
-    private void SetMetric(int m)
+    private void SetMetric(ChartMetric m)
     {
         metric = m;
         this.RaisePropertyChanged(nameof(IsMaxWeight));
@@ -274,24 +277,24 @@ public class GraphsViewModel : ViewModelBase
 
         exerciseYAxis.Name = metric switch
         {
-            0 => $"Max Weight ({WeightHelper.Unit(imperial)})",
-            1 => "Max Reps",
+            ChartMetric.MaxWeight => $"Max Weight ({WeightHelper.Unit(imperial)})",
+            ChartMetric.MaxReps => "Max Reps",
             _ => $"Total Volume ({WeightHelper.Unit(imperial)})"
         };
 
         var points = FilteredSessions()
-            .Where(s => s.Entries.Any(e => e.ExerciseId == SelectedExercise.Id))
-            .OrderBy(s => s.Date)
-            .Select(s =>
+            .Select(s => (s.Date, Entry: s.Entries.FirstOrDefault(e => e.ExerciseId == SelectedExercise.Id)))
+            .Where(x => x.Entry != null)
+            .OrderBy(x => x.Date)
+            .Select(x =>
             {
-                var entry = s.Entries.First(e => e.ExerciseId == SelectedExercise.Id);
                 var y = metric switch
                 {
-                    0 => WeightHelper.ToDisplay(entry.Sets.Max(set => set.Kg), imperial),
-                    1 => entry.Sets.Max(set => (double)set.Reps),
-                    _ => WeightHelper.ToDisplay(entry.Volume, imperial)
+                    ChartMetric.MaxWeight => WeightHelper.ToDisplay(x.Entry!.Sets.Max(set => set.Kg), imperial),
+                    ChartMetric.MaxReps => x.Entry!.Sets.Max(set => (double)set.Reps),
+                    _ => WeightHelper.ToDisplay(x.Entry!.Volume, imperial)
                 };
-                return new DateTimePoint(s.Date.ToDateTime(TimeOnly.MinValue), y);
+                return new DateTimePoint(x.Date.ToDateTime(TimeOnly.MinValue), y);
             })
             .ToArray();
 
@@ -332,7 +335,7 @@ public class GraphsViewModel : ViewModelBase
             [
                 new ColumnSeries<DateTimePoint>
                 {
-                    Name = "Weekly Volume (kg)",
+                    Name = $"Weekly Volume ({WeightHelper.Unit(imperial)})",
                     Values = points,
                     Fill = new SolidColorPaint(AccentColor.WithAlpha(190)),
                     Stroke = null,
@@ -353,7 +356,7 @@ public class GraphsViewModel : ViewModelBase
         {
             var series = new ColumnSeries<DateTimePoint>
             {
-                Name = "Total Volume (kg)",
+                Name = $"Total Volume ({WeightHelper.Unit(imperial)})",
                 Values = points,
                 Fill = new SolidColorPaint(AccentColor.WithAlpha(190)),
                 Stroke = null,

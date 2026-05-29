@@ -1,6 +1,7 @@
 using System;
 using Avalonia.Media;
 using TANREN_Metsuke.Models;
+using TANREN_Metsuke.Theme;
 
 namespace TANREN_Metsuke.Views;
 
@@ -10,8 +11,8 @@ internal record RegionDef(MuscleGroup Group, double X, double Y, double W, doubl
 
 internal static class BodyMapHelper
 {
-    internal static readonly Color MuscleInactive = Color.Parse("#555555");
-    internal static readonly Color BodyLabelGray = Color.Parse("#CCCCCC");
+    internal static readonly Color MuscleInactive = Color.Parse(Palette.MuscleInactive);
+    internal static readonly Color BodyLabelGray = Color.Parse(Palette.BodyLabelGray);
 
     // define all muscle regions with their position, size, shape, and other properties
     internal static RegionDef[] AllRegions() =>

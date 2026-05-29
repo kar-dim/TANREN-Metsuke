@@ -11,7 +11,7 @@ public record SetRecord(double Kg, int Reps, DateOnly Date)
     public string FormatDisplay(bool imperial)
     {
         var w = WeightHelper.ToDisplay(Kg, imperial);
-        var wStr = w % 1 == 0 ? $"{w:F0}" : $"{w:F1}";
+        var wStr = w % 1 == 0 ? $"{w:F0}" : $"{w:F2}";
         return $"{wStr} {WeightHelper.Unit(imperial)} × {Reps}";
     }
 }

@@ -21,8 +21,6 @@ namespace TANREN_Metsuke.Services;
 // then saves them to disk and updates the UI status as it goes.
 public class SyncServer : IDisposable
 {
-    private static readonly JsonSerializerOptions ReadOptions = new() { PropertyNameCaseInsensitive = true };
-
     // workout JSON files are tiny, we cap the body to guard against a malformed or malicious Content-Length
     private const int MaxBodyBytes = 8 * 1024 * 1024;
     // bound the request line, each header line, and the header count so a client cannot exhaust memory before the body is read
@@ -133,7 +131,7 @@ public class SyncServer : IDisposable
     {
         onStatus("Phone connected, checking files...");
 
-        var phoneFiles = JsonSerializer.Deserialize<List<FileMetadata>>(body, ReadOptions) ?? [];
+        var phoneFiles = JsonSerializer.Deserialize<List<FileMetadata>>(body, JsonDefaults.CaseInsensitive) ?? [];
 
         var folder = getFolder();
         Directory.CreateDirectory(folder);
@@ -180,7 +178,7 @@ public class SyncServer : IDisposable
 
     private async Task HandleUploadAsync(Stream stream, string body, CancellationToken ct)
     {
-        var upload = JsonSerializer.Deserialize<FileUpload>(body, ReadOptions);
+        var upload = JsonSerializer.Deserialize<FileUpload>(body, JsonDefaults.CaseInsensitive);
 
         if (upload == null || string.IsNullOrEmpty(upload.Filename))
         {
