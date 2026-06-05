@@ -158,6 +158,7 @@
             <lvc:CartesianChart Series="{Binding ExerciseSeries}"
                                 XAxes="{Binding ExerciseXAxes}"
                                 YAxes="{Binding ExerciseYAxes}"
+                                ZoomMode="X"
                                 LegendPosition="Hidden"
                                 Background="Transparent" />
 
@@ -177,9 +178,11 @@
       <TabItem Header="By Workout">
         <Grid RowDefinitions="*,Auto" Margin="20,14,20,10">
           <Panel Grid.Row="0">
-            <lvc:CartesianChart Series="{Binding WorkoutSeries}"
+            <lvc:CartesianChart x:Name="WorkoutChart"
+                                Series="{Binding WorkoutSeries}"
                                 XAxes="{Binding WorkoutXAxes}"
                                 YAxes="{Binding WorkoutYAxes}"
+                                ZoomMode="X"
                                 LegendPosition="Hidden"
                                 Background="Transparent" />
 
@@ -210,6 +213,7 @@
             <lvc:CartesianChart Series="{Binding WeeklySeries}"
                                 XAxes="{Binding WeeklyXAxes}"
                                 YAxes="{Binding WeeklyYAxes}"
+                                ZoomMode="X"
                                 LegendPosition="Hidden"
                                 Background="Transparent" />
 

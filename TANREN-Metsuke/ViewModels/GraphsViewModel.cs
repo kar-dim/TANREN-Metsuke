@@ -43,6 +43,7 @@ public class GraphsViewModel : ViewModelBase
     private double secondaryWeight;
     private ChartMetric metric;
     private ChartRange range = ChartRange.Month;
+    private WorkoutSession? pendingClickedSession;
 
     public bool Imperial => imperial;
 
@@ -236,6 +237,18 @@ public class GraphsViewModel : ViewModelBase
         UpdateRadarChart();
     }
 
+    // cleared on pointer down and after a pan, we fire the click only when the press was a real click
+    public void ClearPendingWorkoutClick() => pendingClickedSession = null;
+
+    public void CommitWorkoutClickIfPending()
+    {
+        if (pendingClickedSession is { } session)
+        {
+            pendingClickedSession = null;
+            WorkoutSessionClicked?.Invoke(session);
+        }
+    }
+
     public void UpdateSecondaryWeight(double weight)
     {
         secondaryWeight = weight;
@@ -362,14 +375,14 @@ public class GraphsViewModel : ViewModelBase
                 Stroke = null,
                 MaxBarWidth = 22,
             };
+            // pointer down only records which bar is under the cursor, the view commits it on release,
+            // a pan/drag that happens to start on a bar does not open the workout dialog
             series.ChartPointPointerDown += (_, point) =>
             {
                 if (point.Context.DataSource is not DateTimePoint dtp)
                     return;
                 var date = DateOnly.FromDateTime(dtp.DateTime);
-                var session = orderedSessions.FirstOrDefault(s => s.Date == date);
-                if (session != null)
-                    WorkoutSessionClicked?.Invoke(session);
+                pendingClickedSession = orderedSessions.FirstOrDefault(s => s.Date == date);
             };
             WorkoutSeries = [series];
         }
