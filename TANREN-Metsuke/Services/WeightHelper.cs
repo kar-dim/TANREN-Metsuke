@@ -13,7 +13,12 @@ public static class WeightHelper
 
     public static string Format(double kg, bool imperial)
     {
+        return $"{FormatValue(kg, imperial)} {Unit(imperial)}";
+    }
+
+    public static string FormatValue(double kg, bool imperial)
+    {
         double v = ToDisplay(kg, imperial);
-        return v % 1 == 0 ? $"{v:F0} {Unit(imperial)}" : $"{v:F2} {Unit(imperial)}";
+        return Math.Abs(v - Math.Round(v)) < 0.001 ? $"{v:F0}" : $"{v:F2}";
     }
 }

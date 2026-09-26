@@ -15,7 +15,7 @@ using TANREN_Metsuke.Services;
 namespace TANREN_Metsuke.ViewModels;
 
 // ViewModel for the sync page, which starts a local server and generates a QR code for the mobile app to connect and sync workout data
-public class SyncViewModel : ViewModelBase
+public class SyncViewModel : ViewModelBase, IDisposable
 {
     private readonly Func<string> getFolder;
     private SyncServer? server;
@@ -48,15 +48,15 @@ public class SyncViewModel : ViewModelBase
         private set => this.RaiseAndSetIfChanged(ref isReady, value);
     }
 
-    public SyncViewModel(Func<string> getFolder, Action onFileSaved)
+    public SyncViewModel(Func<string> getFolder, Action onSyncCompleted)
     {
         this.getFolder = getFolder;
-        StartServer(onFileSaved);
+        StartServer(onSyncCompleted);
     }
 
     // start the server and generate random QR code for the session
     // the mobile app will scan the QR and provide us with its content
-    private void StartServer(Action onFileSaved)
+    private void StartServer(Action onSyncCompleted)
     {
         try
         {
@@ -71,7 +71,7 @@ public class SyncViewModel : ViewModelBase
                 certificate: cert,
                 getFolder: getFolder,
                 onStatus: msg => Dispatcher.UIThread.Post(() => StatusText = msg),
-                onFileSaved: () => Dispatcher.UIThread.Post(onFileSaved)
+                onSyncCompleted: () => Dispatcher.UIThread.Post(onSyncCompleted)
             );
             server.StartAccepting();
 
@@ -85,6 +85,13 @@ public class SyncViewModel : ViewModelBase
             StatusText = $"Failed to start server: {ex.Message}";
             IsReady = false;
         }
+    }
+
+    public void Dispose()
+    {
+        server?.Dispose();
+        server = null;
+        GC.SuppressFinalize(this);
     }
 
     private static Bitmap GenerateQr(string ip, int port, string token, string cert)

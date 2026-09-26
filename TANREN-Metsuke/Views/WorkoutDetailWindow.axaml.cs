@@ -7,7 +7,7 @@ namespace TANREN_Metsuke.Views;
 
 public partial class WorkoutDetailWindow : Window
 {
-    public WorkoutDetailWindow() => InitializeComponent(); // unused, needed only to stop compiler warnings
+    public WorkoutDetailWindow() => InitializeComponent(); // Required for Avalonia XAML loader (avoids AVLN3001)
 
     public WorkoutDetailWindow(WorkoutSession session, bool imperial = false)
     {

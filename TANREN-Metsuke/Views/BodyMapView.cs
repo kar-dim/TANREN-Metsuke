@@ -29,6 +29,8 @@ public abstract class BodyMapView : UserControl
 
     private bool detailOpen;
     protected MuscleGroup? OpenMuscle { get; private set; }
+    private IDisposable? boundsSubscription;
+    private bool bodyMapBuilt;
 
     // hooks for the parts that differ between subclasses
     protected abstract Color ColorForGroup(MuscleGroup group);
@@ -67,8 +69,27 @@ public abstract class BodyMapView : UserControl
             }
         ];
 
-        // resize the open panel (without animating)
-        this.GetObservable(BoundsProperty).Subscribe(bounds =>
+        SetupBoundsSubscription();
+        EnsureBodyMapBuilt();
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        SetupBoundsSubscription();
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        boundsSubscription?.Dispose();
+        boundsSubscription = null;
+    }
+
+    private void SetupBoundsSubscription()
+    {
+        boundsSubscription?.Dispose();
+        boundsSubscription = this.GetObservable(BoundsProperty).Subscribe(bounds =>
         {
             if (!detailOpen)
                 return;
@@ -84,25 +105,16 @@ public abstract class BodyMapView : UserControl
         });
     }
 
-    protected override void OnDataContextChanged(EventArgs e)
+    private void EnsureBodyMapBuilt()
     {
-        base.OnDataContextChanged(e);
-        if (DataContext == null)
+        if (bodyMapBuilt)
             return;
-
-        AllPaths.Clear();
-        FillBrushes.Clear();
-        overlayCanvas.Children.Clear();
+        bodyMapBuilt = true;
 
         AddLabels();
         foreach (var def in BodyMapHelper.AllRegions())
             BuildRegion(def);
-        ApplyColors();
 
-        OnViewModelChanged();
-        RefreshOpenDetail();
-
-        // Add transitions after initial colors are set, so startup doesn't animate
         foreach (var brush in FillBrushes.Values)
             brush.Transitions =
             [
@@ -112,6 +124,18 @@ public abstract class BodyMapView : UserControl
                     Duration = TimeSpan.FromMilliseconds(160)
                 }
             ];
+    }
+
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        base.OnDataContextChanged(e);
+        if (DataContext == null)
+            return;
+
+        EnsureBodyMapBuilt();
+        ApplyColors();
+        OnViewModelChanged();
+        RefreshOpenDetail();
     }
 
     protected void ApplyColors()

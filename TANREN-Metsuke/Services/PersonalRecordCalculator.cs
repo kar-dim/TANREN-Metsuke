@@ -9,7 +9,6 @@ public static class PersonalRecordCalculator
 {
     public static Dictionary<MuscleGroup, List<ExercisePersonalRecord>> Compute(List<WorkoutSession> sessions, bool imperial = false)
     {
-        var catalog = ExerciseCatalog.All.ToDictionary(e => e.Id);
         var best = new Dictionary<string, (SetRecord? wt, SetRecord? sv)>();
         // search for best weight and best volume for each exercise across all sessions
         foreach (var session in sessions)
@@ -32,7 +31,8 @@ public static class PersonalRecordCalculator
         {
             if (wt == null || sv == null)
                 continue;
-            if (!catalog.TryGetValue(id, out var def))
+            var def = ExerciseCatalog.Get(id);
+            if (def == null)
                 continue;
 
             var pr = new ExercisePersonalRecord(def.Name, wt, sv, imperial);

@@ -1,4 +1,4 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:TANREN_Metsuke.ViewModels"
              xmlns:lvc="using:LiveChartsCore.SkiaSharpView.Avalonia"
@@ -81,12 +81,25 @@
             Background="{StaticResource SidebarBg}"
             BorderBrush="{StaticResource DividerBrush}"
             BorderThickness="1" CornerRadius="8">
-      <StackPanel Orientation="Horizontal" Spacing="2">
+      <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
         <RadioButton Classes="range-btn" Content="7 days" IsChecked="{Binding IsRange7d, Mode=TwoWay}" GroupName="Range"/>
         <RadioButton Classes="range-btn" Content="1 month" IsChecked="{Binding IsRange1m, Mode=TwoWay}" GroupName="Range"/>
         <RadioButton Classes="range-btn" Content="3 months" IsChecked="{Binding IsRange3m, Mode=TwoWay}" GroupName="Range"/>
         <RadioButton Classes="range-btn" Content="6 months" IsChecked="{Binding IsRange6m, Mode=TwoWay}" GroupName="Range"/>
         <RadioButton Classes="range-btn" Content="All time" IsChecked="{Binding IsRangeAll, Mode=TwoWay}" GroupName="Range"/>
+        <RadioButton Classes="range-btn" Content="Custom" IsChecked="{Binding IsRangeCustom, Mode=TwoWay}" GroupName="Range"/>
+
+        <!-- Custom date pickers -->
+        <StackPanel Orientation="Horizontal" Spacing="6" Margin="10,0,6,0"
+                    IsVisible="{Binding IsRangeCustom}" VerticalAlignment="Center">
+          <CalendarDatePicker SelectedDate="{Binding CustomStartDate, Mode=TwoWay}"
+                              PlaceholderText="From" Width="135" Height="30"
+                              FontFamily="{StaticResource OxaniumFont}" FontSize="12" />
+          <TextBlock Text="—" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" />
+          <CalendarDatePicker SelectedDate="{Binding CustomEndDate, Mode=TwoWay}"
+                              PlaceholderText="To" Width="135" Height="30"
+                              FontFamily="{StaticResource OxaniumFont}" FontSize="12" />
+        </StackPanel>
       </StackPanel>
     </Border>
 

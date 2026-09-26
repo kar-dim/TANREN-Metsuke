@@ -54,7 +54,7 @@ public class MainViewModel : ViewModelBase
 
         Sync = new SyncViewModel(
             getFolder: () => SettingsService.WorkoutsFolder,
-            onFileSaved: () => Reload(LoadSessions()));
+            onSyncCompleted: () => Reload(LoadSessions()));
 
         Load(sessions);
     }

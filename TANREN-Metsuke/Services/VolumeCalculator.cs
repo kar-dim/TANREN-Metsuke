@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Runtime.InteropServices;
 using TANREN_Metsuke.Models;
 
 namespace TANREN_Metsuke.Services;
@@ -22,16 +22,17 @@ public static class VolumeCalculator
                 double value = metric(entry);
                 foreach (var muscle in exercise.PrimaryMuscles)
                 {
-                    totals.TryAdd(muscle, 0);
-                    totals[muscle] += value;
+                    ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(totals, muscle, out _);
+                    current += value;
                 }
-                // don't calculate if user has selected "0" wight for secondary!
+                // don't calculate if user has selected "0" weight for secondary!
                 if (secondaryWeight > 0)
                 {
+                    double secVal = value * secondaryWeight;
                     foreach (var muscle in exercise.SecondaryMuscles)
                     {
-                        totals.TryAdd(muscle, 0);
-                        totals[muscle] += value * secondaryWeight;
+                        ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(totals, muscle, out _);
+                        current += secVal;
                     }
                 }
             }
@@ -47,8 +48,10 @@ public static class VolumeCalculator
         GetHistoryForMuscle(List<WorkoutSession> sessions, MuscleGroup muscle, bool includeSecondary = true)
     {
         var results = new List<(DateOnly, string, List<WorkoutSet>, bool)>();
-        foreach (var session in sessions.OrderByDescending(s => s.Date))
+        // reverse loop because sessions are already ordered ascending by Date
+        for (int i = sessions.Count - 1; i >= 0; i--)
         {
+            var session = sessions[i];
             foreach (var entry in session.Entries)
             {
                 var exercise = ExerciseCatalog.Get(entry.ExerciseId);

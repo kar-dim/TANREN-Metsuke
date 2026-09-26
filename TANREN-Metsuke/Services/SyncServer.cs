@@ -11,16 +11,20 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace TANREN_Metsuke.Services;
 
-// Main Sync service, istens for a single client connection from the phone, which sends a manifest of workout files it has
+// Main Sync service, listens for a single client connection from the phone, which sends a manifest of workout files it has
 // the server responds with which files it needs, and the phone uploads them one by one,
-// then saves them to disk and updates the UI status as it goes.
-public class SyncServer : IDisposable
+// then saves them to disk and batches the UI reload when the upload batch finishes.
+public partial class SyncServer : IDisposable
 {
+    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}\.json$")]
+    private static partial Regex WorkoutFilePattern();
+
     // workout JSON files are tiny, we cap the body to guard against a malformed or malicious Content-Length
     private const int MaxBodyBytes = 8 * 1024 * 1024;
     // bound the request line, each header line, and the header count so a client cannot exhaust memory before the body is read
@@ -32,18 +36,22 @@ public class SyncServer : IDisposable
     private readonly X509Certificate2 certificate;
     private readonly Func<string> getFolder;
     private readonly Action<string> onStatus;
-    private readonly Action onFileSaved;
+    private readonly Action onSyncCompleted;
     private readonly CancellationTokenSource cts = new();
+
+    private readonly object syncLock = new();
+    private HashSet<string> pendingFiles = [];
+    private bool batchDirty;
 
     public int Port { get; }
 
-    public SyncServer(string ip, string token, X509Certificate2 certificate, Func<string> getFolder, Action<string> onStatus, Action onFileSaved)
+    public SyncServer(string ip, string token, X509Certificate2 certificate, Func<string> getFolder, Action<string> onStatus, Action onSyncCompleted)
     {
         this.token = token;
         this.certificate = certificate;
         this.getFolder = getFolder;
         this.onStatus = onStatus;
-        this.onFileSaved = onFileSaved;
+        this.onSyncCompleted = onSyncCompleted;
         listener = new TcpListener(IPAddress.Parse(ip), 0);
         listener.Start();
         Port = ((IPEndPoint)listener.LocalEndpoint).Port;
@@ -90,16 +98,18 @@ public class SyncServer : IDisposable
                 return;
             }
 
+            using var buffered = new BufferedStream(ssl, 8192);
+
             string method, path, body;
             Dictionary<string, string> headers;
             try
             {
-                (method, path, headers, body) = await ParseRequestAsync(ssl, ct);
+                (method, path, headers, body) = await ParseRequestAsync(buffered, ct);
             }
             // only if Content-Length is too large
             catch (RequestTooLargeException)
             {
-                await SendResponseAsync(ssl, 413, new { error = "Payload too large" }, ct);
+                await SendResponseAsync(buffered, 413, new { error = "Payload too large" }, ct);
                 return;
             }
 
@@ -108,7 +118,7 @@ public class SyncServer : IDisposable
             var provided = Encoding.UTF8.GetBytes(headers.GetValueOrDefault("Authorization", ""));
             if (!CryptographicOperations.FixedTimeEquals(provided, expected))
             {
-                await SendResponseAsync(ssl, 401, new { error = "Unauthorized" }, ct);
+                await SendResponseAsync(buffered, 401, new { error = "Unauthorized" }, ct);
                 return;
             }
 
@@ -116,16 +126,35 @@ public class SyncServer : IDisposable
             // GET /ping for connectivity check, POST /sync/manifest with the list of files on the phone,
             // then POST /sync/upload for each file the desktop needs, with the file content in the body
             if (method == "GET" && path == "/ping")
-                await SendResponseAsync(ssl, 200, new { ok = true }, ct);
+                await SendResponseAsync(buffered, 200, new { ok = true }, ct);
             else if (method == "POST" && path == "/sync/manifest")
-                await HandleManifestAsync(ssl, body, ct);
+                await HandleManifestAsync(buffered, body, ct);
             else if (method == "POST" && path == "/sync/upload")
-                await HandleUploadAsync(ssl, body, ct);
+                await HandleUploadAsync(buffered, body, ct);
             else
-                await SendResponseAsync(ssl, 404, new { error = "Not found" }, ct);
+                await SendResponseAsync(buffered, 404, new { error = "Not found" }, ct);
         }
         catch (Exception) { /* ignore dropped connections and stream errors */ }
+        finally
+        {
+            // If connection ends while there were uncommitted modifications, notify completion
+            bool notify = false;
+            lock (syncLock)
+            {
+                if (batchDirty)
+                {
+                    notify = true;
+                    batchDirty = false;
+                    pendingFiles.Clear();
+                }
+            }
+            if (notify)
+                onSyncCompleted();
+        }
     }
+
+    private static bool IsSyncableFile(string fileName) =>
+        WorkoutFilePattern().IsMatch(fileName) || fileName.Equals("custom_exercises.json", StringComparison.OrdinalIgnoreCase);
 
     private async Task HandleManifestAsync(Stream stream, string body, CancellationToken ct)
     {
@@ -150,20 +179,36 @@ public class SyncServer : IDisposable
                 needed.Add(pf.Filename);
         }
 
-        // remove local files the phone no longer has
+        // remove local files the phone no longer has (only check syncable files)
         var phoneSet = new HashSet<string>(phoneFiles.Select(f => f.Filename), StringComparer.OrdinalIgnoreCase);
         var deleted = 0;
         foreach (var localFile in Directory.GetFiles(folder, "*.json"))
         {
-            if (!phoneSet.Contains(Path.GetFileName(localFile)))
+            var fileName = Path.GetFileName(localFile);
+            if (!IsSyncableFile(fileName))
+                continue;
+
+            if (!phoneSet.Contains(fileName))
             {
                 File.Delete(localFile);
-                deleted++; //keep track to report in the status (response)
+                deleted++;
             }
         }
 
-        if (deleted > 0)
-            onFileSaved();
+        bool completeNow = false;
+        lock (syncLock)
+        {
+            pendingFiles = new HashSet<string>(needed, StringComparer.OrdinalIgnoreCase);
+            batchDirty = deleted > 0;
+            if (pendingFiles.Count == 0 && batchDirty)
+            {
+                completeNow = true;
+                batchDirty = false;
+            }
+        }
+
+        if (completeNow)
+            onSyncCompleted();
 
         var status = (needed.Count, deleted) switch
         {
@@ -202,7 +247,24 @@ public class SyncServer : IDisposable
 
         onStatus($"Received {safeName}");
         await SendResponseAsync(stream, 200, new { ok = true }, ct);
-        onFileSaved();
+
+        bool batchDone = false;
+        lock (syncLock)
+        {
+            batchDirty = true;
+            pendingFiles.Remove(safeName);
+            if (pendingFiles.Count == 0)
+            {
+                batchDone = true;
+                batchDirty = false;
+            }
+        }
+
+        if (batchDone)
+        {
+            onStatus("Sync complete!");
+            onSyncCompleted();
+        }
     }
 
     private static string ComputeHash(string path)
@@ -251,7 +313,9 @@ public class SyncServer : IDisposable
         var buf = new byte[1];
         while (true)
         {
-            await stream.ReadExactlyAsync(buf, ct);
+            var read = await stream.ReadAsync(buf.AsMemory(0, 1), ct);
+            if (read == 0)
+                break;
             if (buf[0] == '\n')
                 break;
             if (buf[0] != '\r')

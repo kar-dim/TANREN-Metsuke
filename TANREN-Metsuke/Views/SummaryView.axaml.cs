@@ -25,12 +25,20 @@ public partial class SummaryView : BodyMapView
         AttachBodyMap();
     }
 
+    private SummaryViewModel? currentVm;
+
     protected override void OnViewModelChanged()
     {
-        if (ViewModel == null)
-            return;
-        ViewModel.VolumesChanged += OnVolumesChanged;
-        RefreshStats();
+        if (currentVm != null)
+            currentVm.VolumesChanged -= OnVolumesChanged;
+
+        currentVm = ViewModel;
+
+        if (currentVm != null)
+        {
+            currentVm.VolumesChanged += OnVolumesChanged;
+            RefreshStats();
+        }
     }
 
     // refresh stats and colors when volumes change, also refresh detail if it's open to reflect new data
@@ -49,12 +57,10 @@ public partial class SummaryView : BodyMapView
 
     protected override Color ColorForGroup(MuscleGroup group)
     {
-        if (ViewModel == null)
+        if (ViewModel == null || ViewModel.MaxMuscleVolume <= 0)
             return BodyMapHelper.MuscleInactive;
-        var max = ViewModel.MuscleVolumes.Values.DefaultIfEmpty(0).Max();
-        if (max == 0)
-            return BodyMapHelper.MuscleInactive;
-        return HeatColor(ViewModel.MuscleVolumes.GetValueOrDefault(group) / max);
+
+        return HeatColor(ViewModel.MuscleVolumes.GetValueOrDefault(group) / ViewModel.MaxMuscleVolume);
     }
 
     protected override string HoverTextFor(MuscleGroup group)

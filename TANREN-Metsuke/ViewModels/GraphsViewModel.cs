@@ -14,7 +14,7 @@ using TANREN_Metsuke.Theme;
 namespace TANREN_Metsuke.ViewModels;
 
 public enum ChartMetric { MaxWeight, MaxReps, Volume }
-public enum ChartRange { Week, Month, ThreeMonths, SixMonths, All }
+public enum ChartRange { Week, Month, ThreeMonths, SixMonths, All, Custom }
 
 // View model for the graphs tab, responsible for preparing data and configuration for the various charts displayed in that tab
 public class GraphsViewModel : ViewModelBase
@@ -54,6 +54,31 @@ public class GraphsViewModel : ViewModelBase
     public bool IsRange3m { get => range == ChartRange.ThreeMonths; set { if (value) SetRange(ChartRange.ThreeMonths); } }
     public bool IsRange6m { get => range == ChartRange.SixMonths; set { if (value) SetRange(ChartRange.SixMonths); } }
     public bool IsRangeAll { get => range == ChartRange.All; set { if (value) SetRange(ChartRange.All); } }
+    public bool IsRangeCustom { get => range == ChartRange.Custom; set { if (value) SetRange(ChartRange.Custom); } }
+
+    private DateTime? customStartDate;
+    public DateTime? CustomStartDate
+    {
+        get => customStartDate;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref customStartDate, value);
+            if (range == ChartRange.Custom)
+                RefreshAllCharts();
+        }
+    }
+
+    private DateTime? customEndDate;
+    public DateTime? CustomEndDate
+    {
+        get => customEndDate;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref customEndDate, value);
+            if (range == ChartRange.Custom)
+                RefreshAllCharts();
+        }
+    }
 
     private void SetRange(ChartRange r)
     {
@@ -63,14 +88,28 @@ public class GraphsViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(IsRange3m));
         this.RaisePropertyChanged(nameof(IsRange6m));
         this.RaisePropertyChanged(nameof(IsRangeAll));
-        UpdateExerciseChart();
-        UpdateWorkoutChart();
-        UpdateWeeklyChart();
-        UpdateRadarChart();
+        this.RaisePropertyChanged(nameof(IsRangeCustom));
+        RefreshAllCharts();
+    }
+
+    public void RefreshAllCharts()
+    {
+        var filtered = FilteredSessions();
+        UpdateExerciseChart(filtered);
+        UpdateWorkoutChart(filtered);
+        UpdateWeeklyChart(filtered);
+        UpdateRadarChart(filtered);
     }
 
     private List<WorkoutSession> FilteredSessions()
     {
+        if (range == ChartRange.Custom)
+        {
+            var start = customStartDate.HasValue ? DateOnly.FromDateTime(customStartDate.Value) : DateOnly.MinValue;
+            var end = customEndDate.HasValue ? DateOnly.FromDateTime(customEndDate.Value) : DateOnly.MaxValue;
+            return sessions.Where(s => s.Date >= start && s.Date <= end).ToList();
+        }
+
         var today = DateOnly.FromDateTime(DateTime.Today);
         var cutoff = range switch
         {
@@ -80,7 +119,7 @@ public class GraphsViewModel : ViewModelBase
             ChartRange.SixMonths => today.AddMonths(-6),
             _ => DateOnly.MinValue
         };
-        return [.. sessions.Where(s => s.Date >= cutoff)];
+        return sessions.Where(s => s.Date >= cutoff).ToList();
     }
 
     // By Exercise
@@ -90,7 +129,7 @@ public class GraphsViewModel : ViewModelBase
     public ExerciseDefinition? SelectedExercise
     {
         get => selectedExercise;
-        set { this.RaiseAndSetIfChanged(ref selectedExercise, value); UpdateExerciseChart(); }
+        set { this.RaiseAndSetIfChanged(ref selectedExercise, value); UpdateExerciseChart(FilteredSessions()); }
     }
 
     public bool IsMaxWeight { get => metric == ChartMetric.MaxWeight; set { if (value) SetMetric(ChartMetric.MaxWeight); } }
@@ -103,7 +142,7 @@ public class GraphsViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(IsMaxWeight));
         this.RaisePropertyChanged(nameof(IsMaxReps));
         this.RaisePropertyChanged(nameof(IsVolume));
-        UpdateExerciseChart();
+        UpdateExerciseChart(FilteredSessions());
     }
 
     private ISeries[] exerciseSeries = [];
@@ -231,10 +270,13 @@ public class GraphsViewModel : ViewModelBase
             }
         ];
 
+        customEndDate = DateTime.Today;
+        customStartDate = sessions.Count > 0
+            ? sessions.First().Date.ToDateTime(TimeOnly.MinValue)
+            : DateTime.Today.AddMonths(-1);
+
         SelectedExercise = AvailableExercises.FirstOrDefault();
-        UpdateWorkoutChart();
-        UpdateWeeklyChart();
-        UpdateRadarChart();
+        RefreshAllCharts();
     }
 
     // cleared on pointer down and after a pan, we fire the click only when the press was a real click
@@ -253,7 +295,7 @@ public class GraphsViewModel : ViewModelBase
     {
         secondaryWeight = weight;
         this.RaisePropertyChanged(nameof(HasSecondary));
-        UpdateRadarChart();
+        UpdateRadarChart(FilteredSessions());
     }
 
     private static Axis MakeDateAxis(string format, long unitTicks, SolidColorPaint labels, SolidColorPaint grid) =>
@@ -279,7 +321,7 @@ public class GraphsViewModel : ViewModelBase
             MinLimit = 0,
         };
 
-    private void UpdateExerciseChart()
+    private void UpdateExerciseChart(List<WorkoutSession> filtered)
     {
         if (SelectedExercise == null)
         {
@@ -295,7 +337,7 @@ public class GraphsViewModel : ViewModelBase
             _ => $"Total Volume ({WeightHelper.Unit(imperial)})"
         };
 
-        var points = FilteredSessions()
+        var points = filtered
             .Select(s => (s.Date, Entry: s.Entries.FirstOrDefault(e => e.ExerciseId == SelectedExercise.Id)))
             .Where(x => x.Entry != null)
             .OrderBy(x => x.Date)
@@ -331,9 +373,9 @@ public class GraphsViewModel : ViewModelBase
             : [];
     }
 
-    private void UpdateWeeklyChart()
+    private void UpdateWeeklyChart(List<WorkoutSession> filtered)
     {
-        var points = FilteredSessions()
+        var points = filtered
             .GroupBy(s =>
             {
                 var dt = s.Date.ToDateTime(TimeOnly.MinValue);
@@ -358,10 +400,9 @@ public class GraphsViewModel : ViewModelBase
             : [];
     }
 
-    private void UpdateWorkoutChart()
+    private void UpdateWorkoutChart(List<WorkoutSession> filtered)
     {
-        var orderedSessions = FilteredSessions().OrderBy(s => s.Date).ToList();
-        var points = orderedSessions.Select(s =>
+        var points = filtered.Select(s =>
             new DateTimePoint(s.Date.ToDateTime(TimeOnly.MinValue), WeightHelper.ToDisplay(s.TotalVolume, imperial))).ToArray();
 
         HasWorkoutData = points.Length > 0;
@@ -382,7 +423,7 @@ public class GraphsViewModel : ViewModelBase
                 if (point.Context.DataSource is not DateTimePoint dtp)
                     return;
                 var date = DateOnly.FromDateTime(dtp.DateTime);
-                pendingClickedSession = orderedSessions.FirstOrDefault(s => s.Date == date);
+                pendingClickedSession = filtered.FirstOrDefault(s => s.Date == date);
             };
             WorkoutSeries = [series];
         }
@@ -392,10 +433,9 @@ public class GraphsViewModel : ViewModelBase
         }
     }
 
-    private void UpdateRadarChart()
+    private void UpdateRadarChart(List<WorkoutSession> filtered)
     {
-        var sessions = FilteredSessions();
-        var primarySets = VolumeCalculator.AggregatePerMuscle(sessions, e => e.Sets.Count, secondaryWeight: 0);
+        var primarySets = VolumeCalculator.AggregatePerMuscle(filtered, e => e.Sets.Count, secondaryWeight: 0);
         var primarySpoke = RadarSpokes.Select(s => s.Muscles.Sum(m => primarySets.GetValueOrDefault(m))).ToArray();
 
         HasRadarData = primarySpoke.Sum() > 0;
@@ -409,7 +449,7 @@ public class GraphsViewModel : ViewModelBase
         // if secondary, append to the graph! because secondary always adds into the muscle volume
         if (secondaryWeight > 0)
         {
-            var combinedSets = VolumeCalculator.AggregatePerMuscle(sessions, e => e.Sets.Count, secondaryWeight);
+            var combinedSets = VolumeCalculator.AggregatePerMuscle(filtered, e => e.Sets.Count, secondaryWeight);
             var combinedSpoke = RadarSpokes.Select(s => s.Muscles.Sum(m => combinedSets.GetValueOrDefault(m))).ToArray();
             seriesList.Add(new PolarLineSeries<double>
             {
