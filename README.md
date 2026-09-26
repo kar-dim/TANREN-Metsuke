@@ -54,6 +54,37 @@ TANREN Metsuke is a Windows desktop app that reads workout data recorded by [TAN
 
 Sync is done locally over your network: Metsuke shows a QR code, scan it with Kiroku, and the transfer happens directly between phone and desktop. No internet required, no intermediary.
 
+## Desktop–Mobile Sync Protocol Specification
+
+Synchronization occurs strictly over the local network (Wi-Fi):
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Desktop as TANREN-Metsuke (PC)
+    participant Mobile as TANREN-Kiroku (Phone)
+
+    User->>Desktop: Open Sync Tab
+    Desktop->>Desktop: Generate ephemeral RSA-2048 X509Cert
+    Desktop->>Desktop: Bind TcpListener to dynamic port
+    Desktop->>Desktop: Render QR code on screen
+    User->>Mobile: Open Sync Screen & Scan QR
+    Mobile->>Desktop: GET /ping (TLS Pinned, Authorization: Bearer <token>)
+    Desktop-->>Mobile: 200 OK {"ok": true}
+    Mobile->>Desktop: POST /sync/manifest (Phone's file list + SHA256 hashes)
+    Desktop->>Desktop: Compare hashes with local files
+    Desktop->>Desktop: Delete local files absent on phone
+    Desktop-->>Mobile: 200 OK {"needed": ["2026-09-26.json"], "deleted": 0}
+    loop For each file in needed
+        Mobile->>Desktop: POST /sync/upload {"filename": "...", "content": {...}}
+        Desktop->>Desktop: Save file to disk
+        Desktop-->>Mobile: 200 OK {"ok": true}
+    end
+    Desktop->>Desktop: Batch trigger UI reload (onSyncCompleted)
+    Mobile-->>User: "Sync Complete!"
+```
+
 ## Requirements
 
 - Windows 10 or later (x64)
