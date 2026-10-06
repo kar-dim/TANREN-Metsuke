@@ -130,7 +130,10 @@ public abstract class BodyMapView : UserControl
     {
         base.OnDataContextChanged(e);
         if (DataContext == null)
+        {
+            OnViewModelChanged();
             return;
+        }
 
         EnsureBodyMapBuilt();
         ApplyColors();

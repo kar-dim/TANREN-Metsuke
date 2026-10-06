@@ -11,7 +11,7 @@ namespace TANREN_Metsuke.ViewModels;
 public class SummaryViewModel : ViewModelBase
 {
     private readonly List<WorkoutSession> sessions;
-    private readonly bool imperial;
+    private bool imperial;
     private double secondaryWeight;
 
     public int TotalSessions { get; }
@@ -39,6 +39,14 @@ public class SummaryViewModel : ViewModelBase
     {
         this.secondaryWeight = secondaryWeight;
         UpdateVolumes(secondaryWeight);
+        this.RaisePropertyChanged(nameof(StatsDisplay));
+        VolumesChanged?.Invoke();
+    }
+
+    public void UpdateImperial(bool useImperial)
+    {
+        imperial = useImperial;
+        this.RaisePropertyChanged(nameof(IsImperial));
         this.RaisePropertyChanged(nameof(StatsDisplay));
         VolumesChanged?.Invoke();
     }

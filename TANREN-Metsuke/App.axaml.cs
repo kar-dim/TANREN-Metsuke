@@ -1,5 +1,3 @@
-using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -23,19 +21,27 @@ public partial class App : Application
         LiveCharts.Configure(config => config.AddSkiaSharp().AddDefaultMappers());
         // load workout sessions, settings and create the main view model
         var settings = SettingsService.Load();
-        var sessions = MainViewModel.LoadSessions();
-        var mainVm = new MainViewModel(sessions, settings);
+        var mainVm = new MainViewModel([], settings);
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var window = new MainWindow { DataContext = mainVm };
             desktop.MainWindow = window;
-            desktop.Exit += (_, _) => { if (settings.IsDirty) SettingsService.Save(settings); }; // save settings on exit if they were changed (dirty)
-            window.Opened += async (_, _) => await CheckForDataAsync(window, mainVm);
+            desktop.Exit += (_, _) =>
+            {
+                mainVm.Dispose();
+                if (settings.IsDirty) SettingsService.Save(settings);
+            };
+            window.Opened += async (_, _) =>
+            {
+                await mainVm.ReloadAsync();
+                await CheckForDataAsync(window, mainVm);
+            };
         }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime singleViewPlatform)
         {
             singleViewPlatform.MainView = new MainView { DataContext = mainVm };
+            _ = mainVm.ReloadAsync();
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -43,9 +49,7 @@ public partial class App : Application
 
     private static async Task CheckForDataAsync(Window window, MainViewModel vm)
     {
-        var workoutFolder = SettingsService.WorkoutsFolder;
-        var hasData = Directory.Exists(workoutFolder) && Directory.EnumerateFiles(workoutFolder, "*.json").Any();
-        if (hasData)
+        if (vm.HasWorkouts)
             return;
         var dialog = new NoWorkoutsDialog();
         var goToSync = await dialog.ShowDialog<bool>(window);

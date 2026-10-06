@@ -103,7 +103,8 @@
       </StackPanel>
     </Border>
 
-    <TabControl Grid.Row="1" Classes="chart-tabs" Padding="0" TabStripPlacement="Top" Margin="0,10,0,0">
+    <TabControl Grid.Row="1" Classes="chart-tabs" Padding="0" TabStripPlacement="Top" Margin="0,10,0,0"
+                SelectedIndex="{Binding SelectedChartTabIndex}">
 
       <!-- Muscle Radar -->
       <TabItem Header="Muscle Radar">

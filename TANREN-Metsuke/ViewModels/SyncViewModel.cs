@@ -1,11 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Net.NetworkInformation;
-using System.Net.Sockets;
+using System.Reactive;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using QRCoder;
@@ -14,33 +17,53 @@ using TANREN_Metsuke.Services;
 
 namespace TANREN_Metsuke.ViewModels;
 
-// ViewModel for the sync page, which starts a local server and generates a QR code for the mobile app to connect and sync workout data
-public class SyncViewModel : ViewModelBase, IDisposable
+public sealed class SyncViewModel : ViewModelBase, IDisposable
 {
     private readonly Func<string> getFolder;
+    private readonly Func<Task> onSyncCompleted;
+    private readonly SemaphoreSlim refreshGate = new(1);
     private SyncServer? server;
+    private X509Certificate2? certificate;
+    private int generation;
+    private bool disposed;
 
+    public ReactiveCommand<Unit, Unit> RefreshCommand { get; }
+    private List<LanAddress> addresses = [];
+    public List<LanAddress> Addresses
+    {
+        get => addresses;
+        private set => this.RaiseAndSetIfChanged(ref addresses, value);
+    }
+    private LanAddress? selectedAddress;
+    public LanAddress? SelectedAddress
+    {
+        get => selectedAddress;
+        set => this.RaiseAndSetIfChanged(ref selectedAddress, value);
+    }
+    private bool isRefreshing;
+    public bool IsRefreshing
+    {
+        get => isRefreshing;
+        private set => this.RaiseAndSetIfChanged(ref isRefreshing, value);
+    }
     private Bitmap? qrBitmap;
     public Bitmap? QrBitmap
     {
         get => qrBitmap;
         private set => this.RaiseAndSetIfChanged(ref qrBitmap, value);
     }
-
-    private string statusText = "Starting server...";
+    private string statusText = "Finding local network...";
     public string StatusText
     {
         get => statusText;
         private set => this.RaiseAndSetIfChanged(ref statusText, value);
     }
-
     private string connectionInfo = "";
     public string ConnectionInfo
     {
         get => connectionInfo;
         private set => this.RaiseAndSetIfChanged(ref connectionInfo, value);
     }
-
     private bool isReady;
     public bool IsReady
     {
@@ -48,102 +71,131 @@ public class SyncViewModel : ViewModelBase, IDisposable
         private set => this.RaiseAndSetIfChanged(ref isReady, value);
     }
 
-    public SyncViewModel(Func<string> getFolder, Action onSyncCompleted)
+    public SyncViewModel(Func<string> getFolder, Func<Task> onSyncCompleted)
     {
         this.getFolder = getFolder;
-        StartServer(onSyncCompleted);
+        this.onSyncCompleted = onSyncCompleted;
+        RefreshCommand = ReactiveCommand.CreateFromTask(RefreshAsync);
+        NetworkChange.NetworkAddressChanged += OnNetworkChanged;
+        _ = RefreshAsync();
     }
 
-    // start the server and generate random QR code for the session
-    // the mobile app will scan the QR and provide us with its content
-    private void StartServer(Action onSyncCompleted)
+    public async Task RefreshAsync()
     {
+        await refreshGate.WaitAsync();
         try
         {
-            var ip = DetectLocalIp();
-            var token = RandomNumberGenerator.GetHexString(32, lowercase: true); // 128-bit
-            var cert = CertificateManager.LoadOrCreate();
-            var fingerprint = CertificateManager.Fingerprint(cert);
-
-            server = new SyncServer(
-                ip: ip,
-                token: token,
-                certificate: cert,
-                getFolder: getFolder,
-                onStatus: msg => Dispatcher.UIThread.Post(() => StatusText = msg),
-                onSyncCompleted: () => Dispatcher.UIThread.Post(onSyncCompleted)
-            );
+            if (disposed)
+                return;
+            IsRefreshing = true;
+            IsReady = false;
+            ConnectionInfo = "";
+            var oldBitmap = QrBitmap;
+            QrBitmap = null;
+            oldBitmap?.Dispose();
+            var currentGeneration = Interlocked.Increment(ref generation);
+            var oldServer = server;
+            var oldCertificate = certificate;
+            server = null;
+            certificate = null;
+            await Task.Run(() => DisposeConnection(oldServer, oldCertificate));
+            var selectedIp = SelectedAddress?.Ip;
+            var found = await Task.Run(LanAddressDetector.GetAddresses);
+            if (disposed)
+                return;
+            Addresses = found;
+            SelectedAddress = found.FirstOrDefault(a => a.Ip == selectedIp) ?? found.FirstOrDefault();
+            if (SelectedAddress == null)
+            {
+                StatusText = "No local network address found. Connect to Wi-Fi or Ethernet, then refresh.";
+                return;
+            }
+            var ip = SelectedAddress.Ip;
+            var token = RandomNumberGenerator.GetHexString(32, lowercase: true);
+            var connection = await Task.Run(() =>
+            {
+                var cert = CertificateManager.LoadOrCreate();
+                try
+                {
+                    var syncServer = new SyncServer(ip, token, cert, getFolder,
+                        msg => Dispatcher.UIThread.Post(() =>
+                        {
+                            if (!disposed && generation == currentGeneration)
+                                StatusText = msg;
+                        }),
+                        () => Dispatcher.UIThread.Post(async () =>
+                        {
+                            if (!disposed && generation == currentGeneration)
+                                await onSyncCompleted();
+                        }));
+                    return (Server: syncServer, Certificate: cert);
+                }
+                catch { cert.Dispose(); throw; }
+            });
+            if (disposed)
+            {
+                DisposeConnection(connection.Server, connection.Certificate);
+                return;
+            }
+            server = connection.Server;
+            certificate = connection.Certificate;
+            QrBitmap = GenerateQr(ip, server.Port, token, CertificateManager.Fingerprint(certificate));
             server.StartAccepting();
-
-            ConnectionInfo = $"{ip}:{server.Port}";
-            QrBitmap = GenerateQr(ip, server.Port, token, fingerprint);
+            ConnectionInfo = $"{SelectedAddress.AdapterName} — {ip}:{server.Port}";
             StatusText = "Waiting for phone...";
             IsReady = true;
         }
         catch (Exception ex)
         {
-            StatusText = $"Failed to start server: {ex.Message}";
-            IsReady = false;
+            DisposeConnection(server, certificate);
+            server = null;
+            certificate = null;
+            if (!disposed)
+                StatusText = $"Could not start sync: {ex.Message}. Refresh to retry.";
         }
+        finally
+        {
+            if (!disposed)
+                IsRefreshing = false;
+            refreshGate.Release();
+        }
+    }
+
+    private void OnNetworkChanged(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
+    {
+        if (disposed || IsRefreshing)
+            return;
+        IsReady = false;
+        StatusText = "Network addresses changed. Refresh the connection and scan the new QR code.";
+    });
+
+    private static Bitmap GenerateQr(string ip, int port, string token, string cert)
+    {
+        var payload = JsonSerializer.Serialize(new { ip, port, token, cert, protocolVersion = SyncServer.ProtocolVersion });
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(payload, QRCodeGenerator.ECCLevel.Q);
+        using var png = new PngByteQRCode(data);
+        using var stream = new MemoryStream(png.GetGraphic(10));
+        return new Bitmap(stream);
+    }
+
+    private static void DisposeConnection(SyncServer? syncServer, X509Certificate2? cert)
+    {
+        try { syncServer?.Dispose(); }
+        finally { cert?.Dispose(); }
     }
 
     public void Dispose()
     {
-        server?.Dispose();
+        if (disposed)
+            return;
+        disposed = true;
+        NetworkChange.NetworkAddressChanged -= OnNetworkChanged;
+        Interlocked.Increment(ref generation);
+        DisposeConnection(server, certificate);
         server = null;
-        GC.SuppressFinalize(this);
-    }
-
-    private static Bitmap GenerateQr(string ip, int port, string token, string cert)
-    {
-        var payload = JsonSerializer.Serialize(new { ip, port, token, cert });
-        using var generator = new QRCodeGenerator();
-        var data = generator.CreateQrCode(payload, QRCodeGenerator.ECCLevel.Q);
-        var png = new PngByteQRCode(data);
-        var bytes = png.GetGraphic(10);
-        using var ms = new MemoryStream(bytes);
-        return new Bitmap(ms);
-    }
-
-    private static string DetectLocalIp()
-    {
-        // pick the physical LAN interface, not the default route or VPN interface
-        // first pass restricts to wired or wireless adapters, the second pass relaxes that so a real NIC
-        // reporting an unusual type is still found (NOTE: the gateway and subnet checks still exclude VPNs and virtual adapters)
-        return ScanForLan(requireKnownType: true) ?? ScanForLan(requireKnownType: false) ?? "127.0.0.1";
-    }
-
-    private static string? ScanForLan(bool requireKnownType)
-    {
-        foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
-        {
-            if (ni.OperationalStatus != OperationalStatus.Up)
-                continue;
-            if (requireKnownType && ni.NetworkInterfaceType is not (NetworkInterfaceType.Ethernet or NetworkInterfaceType.Wireless80211))
-                continue;
-            var props = ni.GetIPProperties();
-            // virtual and host only adapters have no gateway
-            if (!props.GatewayAddresses.Any(g => g.Address.AddressFamily == AddressFamily.InterNetwork && !g.Address.Equals(IPAddress.Any)))
-                continue;
-            foreach (var addr in props.UnicastAddresses)
-            {
-                if (addr.Address.AddressFamily != AddressFamily.InterNetwork)
-                    continue;
-                if (addr.PrefixLength is < 1 or > 30) // /32 has NO local subnet, mostly for WireGuard style VPN tunnels
-                    continue;
-                if (IsUsableLan(addr.Address))
-                    return addr.Address.ToString();
-            }
-        }
-        return null;
-    }
-
-    // private ranges, excluding APIPA (169.254) and loopback
-    private static bool IsUsableLan(IPAddress ip)
-    {
-        var b = ip.GetAddressBytes();
-        return b[0] == 10
-            || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
-            || (b[0] == 192 && b[1] == 168);
+        certificate = null;
+        QrBitmap?.Dispose();
+        RefreshCommand.Dispose();
     }
 }

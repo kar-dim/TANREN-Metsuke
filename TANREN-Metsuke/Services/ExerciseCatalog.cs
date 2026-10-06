@@ -729,29 +729,27 @@ public static class ExerciseCatalog
     public static IReadOnlyList<ExerciseDefinition> All => all;
 
     // loads custom exercises from a JSON file, if it doesn't exist or is invalid, it falls back to the default exercises only
-    public static void LoadCustomExercises()
+    public static List<ExerciseDefinition> ReadCustomExercises(string folder, Action<string>? onWarning = null)
     {
-        var path = Path.Combine(SettingsService.WorkoutsFolder, "custom_exercises.json");
-        List<ExerciseDefinition> customExercises = [];
-        if (File.Exists(path))
+        var path = Path.Combine(folder, WorkoutJson.CustomExercisesFilename);
+        if (!File.Exists(path))
+            return [];
+        try
         {
-            try
-            {
-                var json = File.ReadAllText(path);
-                var dtos = JsonSerializer.Deserialize<List<CustomExerciseDto>>(json, JsonDefaults.CaseInsensitive) ?? [];
-                customExercises = [.. dtos.Select(dto => new ExerciseDefinition
-                {
-                    Id = dto.Id,
-                    Name = dto.Name,
-                    PrimaryMuscles = [.. dto.PrimaryMuscles.Select(ParseMuscle).Where(m => m.HasValue).Select(m => m!.Value)],
-                    SecondaryMuscles = [.. dto.SecondaryMuscles.Select(ParseMuscle).Where(m => m.HasValue).Select(m => m!.Value)]
-                })];
-            }
-            catch
-            {
-                customExercises = [];
-            }
+            return WorkoutJson.ReadCustomExercises(File.ReadAllText(path));
         }
+        catch (Exception ex) when (ex is JsonException or InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            onWarning?.Invoke($"Skipped custom exercises: {ex.Message}");
+            return [];
+        }
+    }
+
+    public static void LoadCustomExercises() => SetCustomExercises(ReadCustomExercises(SettingsService.WorkoutsFolder));
+
+    public static void SetCustomExercises(List<ExerciseDefinition> customExercises)
+    {
+        customExercises = customExercises.Where(e => !builtinById.ContainsKey(e.Id)).ToList();
 
         if (customExercises.Count == 0)
         {
@@ -770,13 +768,4 @@ public static class ExerciseCatalog
         lookup = merged;
     }
 
-    private static MuscleGroup? ParseMuscle(string name) => Enum.TryParse<MuscleGroup>(name, true, out var g) ? g : null;
-}
-
-file class CustomExerciseDto
-{
-    public string Id { get; set; } = "";
-    public string Name { get; set; } = "";
-    public List<string> PrimaryMuscles { get; set; } = [];
-    public List<string> SecondaryMuscles { get; set; } = [];
 }

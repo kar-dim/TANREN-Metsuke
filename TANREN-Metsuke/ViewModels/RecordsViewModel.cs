@@ -8,7 +8,8 @@ namespace TANREN_Metsuke.ViewModels;
 // ViewModel for displaying personal records across different muscle groups
 public class RecordsViewModel : ViewModelBase
 {
-    private readonly Dictionary<MuscleGroup, List<ExercisePersonalRecord>> records;
+    private Dictionary<MuscleGroup, List<ExercisePersonalRecord>> records;
+    public event System.Action? RecordsChanged;
 
     public int TotalExercisesTracked { get; }
 
@@ -18,7 +19,7 @@ public class RecordsViewModel : ViewModelBase
         // an exercise can list several primary muscles, so we count distinct exercises to not count duplicates
         TotalExercisesTracked = records.Values
             .SelectMany(list => list)
-            .Select(pr => pr.ExerciseName)
+            .Select(pr => pr.ExerciseId)
             .Distinct()
             .Count();
     }
@@ -28,4 +29,10 @@ public class RecordsViewModel : ViewModelBase
     public bool HasRecords(MuscleGroup muscle) => records.TryGetValue(muscle, out var list) && list.Count > 0;
 
     public int RecordCount(MuscleGroup muscle) => records.GetValueOrDefault(muscle)?.Count ?? 0;
+
+    public void UpdateImperial(bool imperial)
+    {
+        records = records.ToDictionary(pair => pair.Key, pair => pair.Value.Select(pr => pr with { Imperial = imperial }).ToList());
+        RecordsChanged?.Invoke();
+    }
 }

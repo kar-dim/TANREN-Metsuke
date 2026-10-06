@@ -37,15 +37,18 @@ public class GraphsViewModel : ViewModelBase
         ("Glutes", [MuscleGroup.Glutes]),
     ];
 
-    private readonly List<WorkoutSession> sessions;
+    private List<WorkoutSession> sessions;
+    private Dictionary<string, List<(DateOnly Date, List<WorkoutSet> Sets)>> exerciseHistory = [];
+    private Dictionary<DateOnly, double> sessionVolumes = [];
     private readonly Axis exerciseYAxis;
-    private readonly bool imperial;
+    private bool imperial;
     private double secondaryWeight;
     private ChartMetric metric;
     private ChartRange range = ChartRange.Month;
     private WorkoutSession? pendingClickedSession;
 
     public bool Imperial => imperial;
+    public int SelectedChartTabIndex { get; set; }
 
     public event Action<WorkoutSession>? WorkoutSessionClicked;
 
@@ -113,17 +116,22 @@ public class GraphsViewModel : ViewModelBase
         var today = DateOnly.FromDateTime(DateTime.Today);
         var cutoff = range switch
         {
-            ChartRange.Week => today.AddDays(-7),
+            ChartRange.Week => today.AddDays(-6),
             ChartRange.Month => today.AddMonths(-1),
             ChartRange.ThreeMonths => today.AddMonths(-3),
             ChartRange.SixMonths => today.AddMonths(-6),
             _ => DateOnly.MinValue
         };
-        return sessions.Where(s => s.Date >= cutoff).ToList();
+        return sessions.Where(s => s.Date >= cutoff && (range == ChartRange.All || s.Date <= today)).ToList();
     }
 
     // By Exercise
-    public List<ExerciseDefinition> AvailableExercises { get; }
+    private List<ExerciseDefinition> availableExercises = [];
+    public List<ExerciseDefinition> AvailableExercises
+    {
+        get => availableExercises;
+        private set => this.RaiseAndSetIfChanged(ref availableExercises, value);
+    }
 
     private ExerciseDefinition? selectedExercise;
     public ExerciseDefinition? SelectedExercise
@@ -221,12 +229,11 @@ public class GraphsViewModel : ViewModelBase
     // initialize the view model (all charts are initialized here)
     public GraphsViewModel(List<WorkoutSession> sessions, bool imperial = false, double secondaryWeight = 0)
     {
-        this.sessions = sessions;
+        this.sessions = sessions.OrderBy(s => s.Date).ToList();
         this.imperial = imperial;
         this.secondaryWeight = secondaryWeight;
 
-        var usedIds = sessions.SelectMany(s => s.Entries).Select(e => e.ExerciseId).ToHashSet();
-        AvailableExercises = [.. ExerciseCatalog.All.Where(e => usedIds.Contains(e.Id)).OrderBy(e => e.Name)];
+        IndexSessions();
 
         var labelPaint = new SolidColorPaint(TextMuted);
         var gridPaint = new SolidColorPaint(DividerBrush);
@@ -275,7 +282,39 @@ public class GraphsViewModel : ViewModelBase
             ? sessions.First().Date.ToDateTime(TimeOnly.MinValue)
             : DateTime.Today.AddMonths(-1);
 
-        SelectedExercise = AvailableExercises.FirstOrDefault();
+        selectedExercise = AvailableExercises.FirstOrDefault();
+        RefreshAllCharts();
+    }
+
+    private void IndexSessions()
+    {
+        exerciseHistory = sessions.SelectMany(s => s.Entries.Where(e => e.Sets.Count > 0).Select(e => (s.Date, Entry: e)))
+            .GroupBy(x => x.Entry.ExerciseId)
+            .ToDictionary(g => g.Key, g => g.GroupBy(x => x.Date)
+                .Select(day => (day.Key, day.SelectMany(x => x.Entry.Sets).ToList())).OrderBy(x => x.Key).ToList());
+        sessionVolumes = sessions.GroupBy(s => s.Date).ToDictionary(g => g.Key, g => g.Sum(s => s.TotalVolume));
+        AvailableExercises = exerciseHistory.Keys.Select(id => ExerciseCatalog.Get(id) ?? new ExerciseDefinition { Id = id, Name = id })
+            .OrderBy(e => e.Name).ToList();
+    }
+
+    public void UpdateSessions(List<WorkoutSession> updated)
+    {
+        var selectedId = selectedExercise?.Id;
+        sessions = updated.OrderBy(s => s.Date).ToList();
+        pendingClickedSession = null;
+        IndexSessions();
+        selectedExercise = AvailableExercises.FirstOrDefault(e => e.Id == selectedId) ?? AvailableExercises.FirstOrDefault();
+        this.RaisePropertyChanged(nameof(SelectedExercise));
+        RefreshAllCharts();
+    }
+
+    public void UpdateImperial(bool useImperial)
+    {
+        if (imperial == useImperial)
+            return;
+        imperial = useImperial;
+        this.RaisePropertyChanged(nameof(Imperial));
+        WorkoutYAxes[0].Name = WeeklyYAxes[0].Name = $"Load Volume ({WeightHelper.Unit(imperial)})";
         RefreshAllCharts();
     }
 
@@ -337,17 +376,16 @@ public class GraphsViewModel : ViewModelBase
             _ => $"Total Volume ({WeightHelper.Unit(imperial)})"
         };
 
-        var points = filtered
-            .Select(s => (s.Date, Entry: s.Entries.FirstOrDefault(e => e.ExerciseId == SelectedExercise.Id)))
-            .Where(x => x.Entry != null)
-            .OrderBy(x => x.Date)
+        var dates = filtered.Select(s => s.Date).ToHashSet();
+        var points = exerciseHistory.GetValueOrDefault(SelectedExercise.Id, [])
+            .Where(x => dates.Contains(x.Date) && x.Sets.Count > 0)
             .Select(x =>
             {
                 var y = metric switch
                 {
-                    ChartMetric.MaxWeight => WeightHelper.ToDisplay(x.Entry!.Sets.Max(set => set.Kg), imperial),
-                    ChartMetric.MaxReps => x.Entry!.Sets.Max(set => (double)set.Reps),
-                    _ => WeightHelper.ToDisplay(x.Entry!.Volume, imperial)
+                    ChartMetric.MaxWeight => WeightHelper.ToDisplay(x.Sets.Max(set => set.Kg), imperial),
+                    ChartMetric.MaxReps => x.Sets.Max(set => (double)set.Reps),
+                    _ => WeightHelper.ToDisplay(x.Sets.Sum(set => set.Volume), imperial)
                 };
                 return new DateTimePoint(x.Date.ToDateTime(TimeOnly.MinValue), y);
             })
@@ -367,7 +405,7 @@ public class GraphsViewModel : ViewModelBase
                     GeometrySize = 8,
                     GeometryStroke = new SolidColorPaint(AccentColor, 2),
                     GeometryFill = new SolidColorPaint(CardBg),
-                    LineSmoothness = 0.4,
+                    LineSmoothness = 0,
                 }
             ]
             : [];
@@ -380,7 +418,7 @@ public class GraphsViewModel : ViewModelBase
             {
                 var dt = s.Date.ToDateTime(TimeOnly.MinValue);
                 var daysFromMonday = ((int)dt.DayOfWeek + 6) % 7; // weekly chart groups by Monday
-                return dt.AddDays(-daysFromMonday).Date;
+                return dt.Ticks >= daysFromMonday * TimeSpan.TicksPerDay ? dt.AddDays(-daysFromMonday).Date : dt.Date;
             })
             .Select(g => new DateTimePoint(g.Key, WeightHelper.ToDisplay(g.Sum(s => s.TotalVolume), imperial))).OrderBy(p => p.DateTime).ToArray();
 
@@ -402,8 +440,8 @@ public class GraphsViewModel : ViewModelBase
 
     private void UpdateWorkoutChart(List<WorkoutSession> filtered)
     {
-        var points = filtered.Select(s =>
-            new DateTimePoint(s.Date.ToDateTime(TimeOnly.MinValue), WeightHelper.ToDisplay(s.TotalVolume, imperial))).ToArray();
+        var points = filtered.Select(s => s.Date).Distinct().Select(date =>
+            new DateTimePoint(date.ToDateTime(TimeOnly.MinValue), WeightHelper.ToDisplay(sessionVolumes[date], imperial))).ToArray();
 
         HasWorkoutData = points.Length > 0;
         if (HasWorkoutData)
@@ -435,8 +473,7 @@ public class GraphsViewModel : ViewModelBase
 
     private void UpdateRadarChart(List<WorkoutSession> filtered)
     {
-        var primarySets = VolumeCalculator.AggregatePerMuscle(filtered, e => e.Sets.Count, secondaryWeight: 0);
-        var primarySpoke = RadarSpokes.Select(s => s.Muscles.Sum(m => primarySets.GetValueOrDefault(m))).ToArray();
+        var primarySpoke = CountSpokeSets(filtered, 0);
 
         HasRadarData = primarySpoke.Sum() > 0;
         if (!HasRadarData)
@@ -449,8 +486,7 @@ public class GraphsViewModel : ViewModelBase
         // if secondary, append to the graph! because secondary always adds into the muscle volume
         if (secondaryWeight > 0)
         {
-            var combinedSets = VolumeCalculator.AggregatePerMuscle(filtered, e => e.Sets.Count, secondaryWeight);
-            var combinedSpoke = RadarSpokes.Select(s => s.Muscles.Sum(m => combinedSets.GetValueOrDefault(m))).ToArray();
+            var combinedSpoke = CountSpokeSets(filtered, secondaryWeight);
             seriesList.Add(new PolarLineSeries<double>
             {
                 Name = "With Secondary",
@@ -475,5 +511,25 @@ public class GraphsViewModel : ViewModelBase
         });
 
         RadarSeries = [.. seriesList];
+    }
+
+    private static double[] CountSpokeSets(List<WorkoutSession> filtered, double secondaryWeight)
+    {
+        var totals = new double[RadarSpokes.Length];
+        foreach (var entry in filtered.SelectMany(s => s.Entries))
+        {
+            var exercise = ExerciseCatalog.Get(entry.ExerciseId);
+            if (exercise == null)
+                continue;
+            for (var i = 0; i < RadarSpokes.Length; i++)
+            {
+                var muscles = RadarSpokes[i].Muscles;
+                if (muscles.Any(m => exercise.PrimaryMuscles.Contains(m)))
+                    totals[i] += entry.Sets.Count;
+                else if (muscles.Any(m => exercise.SecondaryMuscles.Contains(m)))
+                    totals[i] += entry.Sets.Count * secondaryWeight;
+            }
+        }
+        return totals;
     }
 }

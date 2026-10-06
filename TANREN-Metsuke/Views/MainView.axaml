@@ -9,7 +9,13 @@
              x:Class="TANREN_Metsuke.Views.MainView"
              x:DataType="vm:MainViewModel">
 
-  <TabControl Padding="0" SelectedIndex="{Binding SelectedTabIndex}">
+  <Grid RowDefinitions="Auto,*">
+    <Border Grid.Row="0" IsVisible="{Binding HasDataWarning}" Background="{StaticResource CardBg}" Padding="14,8">
+      <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <TextBlock Text="{Binding DataWarning}" TextWrapping="Wrap" Foreground="{StaticResource SecondaryBrush}" />
+      </ScrollViewer>
+    </Border>
+  <TabControl Grid.Row="1" Padding="0" SelectedIndex="{Binding SelectedTabIndex}">
     <TabControl.Template>
       <ControlTemplate>
         <Grid ColumnDefinitions="180,*">
@@ -100,5 +106,6 @@
     </TabItem>
 
   </TabControl>
+  </Grid>
 
 </UserControl>

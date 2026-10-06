@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -10,350 +9,267 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace TANREN_Metsuke.Services;
 
-// Main Sync service, listens for a single client connection from the phone, which sends a manifest of workout files it has
-// the server responds with which files it needs, and the phone uploads them one by one,
-// then saves them to disk and batches the UI reload when the upload batch finishes.
-public partial class SyncServer : IDisposable
+// TLS HTTP/1.1 with bounded clients and keep-alive. Batch lifetime is independent of connections.
+public sealed class SyncServer : IDisposable
 {
-    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}\.json$")]
-    private static partial Regex WorkoutFilePattern();
-
-    // workout JSON files are tiny, we cap the body to guard against a malformed or malicious Content-Length
+    public const int ProtocolVersion = 2;
     private const int MaxBodyBytes = 8 * 1024 * 1024;
-    // bound the request line, each header line, and the header count so a client cannot exhaust memory before the body is read
     private const int MaxLineBytes = 8 * 1024;
     private const int MaxHeaderCount = 100;
-
     private readonly TcpListener listener;
-    private readonly string token;
+    private readonly byte[] authorization;
     private readonly X509Certificate2 certificate;
-    private readonly Func<string> getFolder;
     private readonly Action<string> onStatus;
     private readonly Action onSyncCompleted;
     private readonly CancellationTokenSource cts = new();
-
-    private readonly object syncLock = new();
-    private HashSet<string> pendingFiles = [];
-    private bool batchDirty;
+    private readonly SemaphoreSlim clients = new(8);
+    private readonly SemaphoreSlim requests = new(1);
+    private readonly SyncBatchStore store;
+    private Task? accepting;
+    private int disposed;
 
     public int Port { get; }
 
     public SyncServer(string ip, string token, X509Certificate2 certificate, Func<string> getFolder, Action<string> onStatus, Action onSyncCompleted)
     {
-        this.token = token;
+        authorization = Encoding.UTF8.GetBytes($"Bearer {token}");
         this.certificate = certificate;
-        this.getFolder = getFolder;
         this.onStatus = onStatus;
         this.onSyncCompleted = onSyncCompleted;
+        store = new SyncBatchStore(getFolder());
         listener = new TcpListener(IPAddress.Parse(ip), 0);
         listener.Start();
         Port = ((IPEndPoint)listener.LocalEndpoint).Port;
     }
 
-    public void StartAccepting() => Task.Run(() => AcceptLoopAsync(cts.Token));
+    public void StartAccepting() => accepting ??= Task.Run(() => AcceptLoopAsync(cts.Token));
 
     private async Task AcceptLoopAsync(CancellationToken ct)
     {
-        while (!ct.IsCancellationRequested)
-        {
-            try
-            {
-                var client = await listener.AcceptTcpClientAsync(ct);
-                _ = Task.Run(() => HandleClientAsync(client, ct), ct);
-            }
-            catch (Exception) when (ct.IsCancellationRequested) { break; }
-            catch (Exception) { /* ignore accept errors */ }
-        }
-    }
-
-    private async Task HandleClientAsync(TcpClient tcpClient, CancellationToken ct)
-    {
-        using var _ = tcpClient;
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(TimeSpan.FromSeconds(30));
-        ct = timeout.Token;
-
         try
         {
-            using var ssl = new SslStream(tcpClient.GetStream(), false);
-            try
+            while (!ct.IsCancellationRequested)
             {
+                await clients.WaitAsync(ct);
+                TcpClient client;
+                try { client = await listener.AcceptTcpClientAsync(ct); }
+                catch { clients.Release(); throw; }
+                _ = HandleClientAsync(client, ct);
+            }
+        }
+        catch (Exception) when (ct.IsCancellationRequested) { }
+        catch (Exception ex) { onStatus($"Sync listener stopped: {ex.Message}. Refresh the connection to retry."); }
+    }
+
+    private async Task HandleClientAsync(TcpClient tcpClient, CancellationToken serverToken)
+    {
+        using var client = tcpClient;
+        try
+        {
+            using var ssl = new SslStream(client.GetStream(), false);
+            using (var handshake = CancellationTokenSource.CreateLinkedTokenSource(serverToken))
+            {
+                handshake.CancelAfter(TimeSpan.FromSeconds(10));
                 await ssl.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
                 {
                     ServerCertificate = certificate,
                     ClientCertificateRequired = false,
                     EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13
-                }, ct);
+                }, handshake.Token);
             }
-            catch (Exception ex)
-            {
-                onStatus($"TLS handshake failed: {ex.Message}");
-                return;
-            }
-
             using var buffered = new BufferedStream(ssl, 8192);
+            await HandleHttpConnectionAsync(buffered, serverToken);
+        }
+        catch (AuthenticationException ex) { onStatus($"TLS handshake failed: {ex.Message}. Refresh the connection and scan the new QR code."); }
+        catch (Exception ex) when (ex is IOException or OperationCanceledException or SocketException or ObjectDisposedException) { }
+        catch (Exception ex) { onStatus($"Sync request failed: {ex.Message}"); }
+        finally { clients.Release(); }
+    }
 
-            string method, path, body;
-            Dictionary<string, string> headers;
-            try
-            {
-                (method, path, headers, body) = await ParseRequestAsync(buffered, ct);
-            }
-            // only if Content-Length is too large
+    internal async Task HandleHttpConnectionAsync(Stream stream, CancellationToken serverToken)
+    {
+        while (!serverToken.IsCancellationRequested)
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(serverToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(30));
+            var ct = timeout.Token;
+            HttpRequest? request;
+            try { request = await ParseRequestAsync(stream, ct); }
             catch (RequestTooLargeException)
             {
-                await SendResponseAsync(buffered, 413, new { error = "Payload too large" }, ct);
+                await SendResponseAsync(stream, 413, new { error = "Payload too large" }, false, ct);
                 return;
             }
-
-            // constant time comparison to avoid side channel attacks (unlikely but let's be safe)
-            var expected = Encoding.UTF8.GetBytes($"Bearer {token}");
-            var provided = Encoding.UTF8.GetBytes(headers.GetValueOrDefault("Authorization", ""));
-            if (!CryptographicOperations.FixedTimeEquals(provided, expected))
+            catch (InvalidDataException ex)
             {
-                await SendResponseAsync(buffered, 401, new { error = "Unauthorized" }, ct);
+                await SendResponseAsync(stream, 400, new { error = ex.Message }, false, ct);
                 return;
             }
-
-            // follow the protocol between desktop and mobile:
-            // GET /ping for connectivity check, POST /sync/manifest with the list of files on the phone,
-            // then POST /sync/upload for each file the desktop needs, with the file content in the body
-            if (method == "GET" && path == "/ping")
-                await SendResponseAsync(buffered, 200, new { ok = true }, ct);
-            else if (method == "POST" && path == "/sync/manifest")
-                await HandleManifestAsync(buffered, body, ct);
-            else if (method == "POST" && path == "/sync/upload")
-                await HandleUploadAsync(buffered, body, ct);
-            else
-                await SendResponseAsync(buffered, 404, new { error = "Not found" }, ct);
+            if (request == null)
+                return;
+            var keepAlive = !request.Headers.GetValueOrDefault("Connection", "").Equals("close", StringComparison.OrdinalIgnoreCase);
+            if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(request.Headers.GetValueOrDefault("Authorization", "")), authorization))
+            {
+                await SendResponseAsync(stream, 401, new { error = "Unauthorized" }, false, ct);
+                return;
+            }
+            await ProcessRequestAsync(stream, request.Method, request.Path, request.Body, keepAlive, ct);
+            if (!keepAlive)
+                return;
         }
-        catch (Exception) { /* ignore dropped connections and stream errors */ }
-        finally
+    }
+
+    private async Task ProcessRequestAsync(Stream stream, string method, string path, string body, bool keepAlive, CancellationToken ct)
+    {
+        await requests.WaitAsync(ct);
+        try
         {
-            // If connection ends while there were uncommitted modifications, notify completion
-            bool notify = false;
-            lock (syncLock)
+            try
             {
-                if (batchDirty)
+                if (method == "GET" && path == "/ping")
+                    await SendResponseAsync(stream, 200, new { ok = true, protocolVersion = ProtocolVersion }, keepAlive, ct);
+                else if (method == "POST" && path == "/sync/manifest")
                 {
-                    notify = true;
-                    batchDirty = false;
-                    pendingFiles.Clear();
+                    using var document = JsonDocument.Parse(body);
+                    var root = document.RootElement;
+                    if (root.ValueKind != JsonValueKind.Object ||
+                        !root.TryGetProperty("protocolVersion", out var version) || version.ValueKind != JsonValueKind.Number || !version.TryGetInt32(out var number) || number != ProtocolVersion ||
+                        !root.TryGetProperty("complete", out var complete) || complete.ValueKind != JsonValueKind.True ||
+                        !root.TryGetProperty("files", out var files) || files.ValueKind != JsonValueKind.Array)
+                        throw new InvalidDataException("Sync requires protocolVersion 2 and a complete file manifest. Update TANREN Kiroku.");
+                    var metadata = JsonSerializer.Deserialize<List<SyncFileMetadata>>(files.GetRawText(), JsonDefaults.CaseInsensitive)!;
+                    var result = store.Begin(metadata);
+                    onStatus($"Requesting {result.Needed.Length} file(s). Desktop data is unchanged until transfer completes.");
+                    await SendResponseAsync(stream, 200, new { sessionId = result.SessionId, needed = result.Needed, deleted = result.Deleted }, keepAlive, ct);
                 }
+                else if (method == "POST" && path == "/sync/upload")
+                {
+                    var upload = JsonSerializer.Deserialize<FileUpload>(body, JsonDefaults.CaseInsensitive)
+                        ?? throw new InvalidDataException("Missing upload.");
+                    store.Upload(upload.SessionId, upload.Filename, upload.Content);
+                    onStatus($"Received {upload.Filename}; waiting for transfer completion.");
+                    await SendResponseAsync(stream, 200, new { ok = true }, keepAlive, ct);
+                }
+                else if (method == "POST" && path == "/sync/complete")
+                {
+                    var completion = JsonSerializer.Deserialize<CompletionRequest>(body, JsonDefaults.CaseInsensitive)
+                        ?? throw new InvalidDataException("Missing completion request.");
+                    var changed = store.Complete(completion.SessionId);
+                    onStatus(changed ? "Sync complete! Previous data saved in sync-backups." : "Sync complete; desktop is up to date.");
+                    if (changed)
+                        onSyncCompleted();
+                    await SendResponseAsync(stream, 200, new { ok = true }, keepAlive, ct);
+                }
+                else
+                    await SendResponseAsync(stream, 404, new { error = "Not found" }, keepAlive, ct);
             }
-            if (notify)
-                onSyncCompleted();
+            catch (Exception ex) when (ex is JsonException or InvalidDataException or ArgumentException or InvalidOperationException)
+            {
+                await SendResponseAsync(stream, ex is InvalidOperationException ? 409 : 400, new { error = ex.Message }, keepAlive, ct);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                onStatus($"Sync storage error: {ex.Message}");
+                await SendResponseAsync(stream, 500, new { error = "Could not save the transfer. Retry sync; the previous desktop snapshot is retained." }, keepAlive, ct);
+            }
         }
+        finally { requests.Release(); }
     }
 
-    private static bool IsSyncableFile(string fileName) =>
-        WorkoutFilePattern().IsMatch(fileName) || fileName.Equals("custom_exercises.json", StringComparison.OrdinalIgnoreCase);
-
-    private async Task HandleManifestAsync(Stream stream, string body, CancellationToken ct)
-    {
-        onStatus("Phone connected, checking files...");
-
-        var phoneFiles = JsonSerializer.Deserialize<List<FileMetadata>>(body, JsonDefaults.CaseInsensitive) ?? [];
-
-        var folder = getFolder();
-        Directory.CreateDirectory(folder);
-        List<string> needed = [];
-
-        foreach (var pf in phoneFiles)
-        {
-            var localPath = Path.Combine(folder, pf.Filename);
-            if (!File.Exists(localPath))
-            {
-                needed.Add(pf.Filename);
-                continue;
-            }
-            // if hash differs, the mobile need to reupload, maybe the file was modified on the phone since last sync
-            if (ComputeHash(localPath) != pf.Hash)
-                needed.Add(pf.Filename);
-        }
-
-        // remove local files the phone no longer has (only check syncable files)
-        var phoneSet = new HashSet<string>(phoneFiles.Select(f => f.Filename), StringComparer.OrdinalIgnoreCase);
-        var deleted = 0;
-        foreach (var localFile in Directory.GetFiles(folder, "*.json"))
-        {
-            var fileName = Path.GetFileName(localFile);
-            if (!IsSyncableFile(fileName))
-                continue;
-
-            if (!phoneSet.Contains(fileName))
-            {
-                File.Delete(localFile);
-                deleted++;
-            }
-        }
-
-        bool completeNow = false;
-        lock (syncLock)
-        {
-            pendingFiles = new HashSet<string>(needed, StringComparer.OrdinalIgnoreCase);
-            batchDirty = deleted > 0;
-            if (pendingFiles.Count == 0 && batchDirty)
-            {
-                completeNow = true;
-                batchDirty = false;
-            }
-        }
-
-        if (completeNow)
-            onSyncCompleted();
-
-        var status = (needed.Count, deleted) switch
-        {
-            (0, 0) => "Already up to date",
-            (0, _) => $"Removed {deleted} file(s) from desktop",
-            (_, 0) => $"Requesting {needed.Count} file(s)...",
-            _ => $"Requesting {needed.Count} file(s), removed {deleted}..."
-        };
-        onStatus(status);
-        await SendResponseAsync(stream, 200, new { needed, deleted }, ct);
-    }
-
-    private async Task HandleUploadAsync(Stream stream, string body, CancellationToken ct)
-    {
-        var upload = JsonSerializer.Deserialize<FileUpload>(body, JsonDefaults.CaseInsensitive);
-
-        if (upload == null || string.IsNullOrEmpty(upload.Filename))
-        {
-            await SendResponseAsync(stream, 400, new { error = "Missing filename" }, ct);
-            return;
-        }
-
-        var safeName = Path.GetFileName(upload.Filename);
-        if (string.IsNullOrEmpty(safeName) || safeName != upload.Filename ||
-            !safeName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-        {
-            await SendResponseAsync(stream, 400, new { error = "Invalid filename" }, ct);
-            return;
-        }
-
-        var folder = getFolder();
-        Directory.CreateDirectory(folder);
-
-        var contentJson = upload.Content.GetRawText(); //data from mobile (it is ALREADY in json, no need to serialize again)
-        await File.WriteAllTextAsync(Path.Combine(folder, safeName), contentJson, new UTF8Encoding(false), ct);
-
-        onStatus($"Received {safeName}");
-        await SendResponseAsync(stream, 200, new { ok = true }, ct);
-
-        bool batchDone = false;
-        lock (syncLock)
-        {
-            batchDirty = true;
-            pendingFiles.Remove(safeName);
-            if (pendingFiles.Count == 0)
-            {
-                batchDone = true;
-                batchDirty = false;
-            }
-        }
-
-        if (batchDone)
-        {
-            onStatus("Sync complete!");
-            onSyncCompleted();
-        }
-    }
-
-    private static string ComputeHash(string path)
-    {
-        using var fs = File.OpenRead(path);
-        return Convert.ToHexString(SHA256.HashData(fs)).ToLowerInvariant(); //hash is SHA256 (mobile already computes this, we just compare)
-    }
-
-    private static async Task<(string Method, string Path, Dictionary<string, string> Headers, string Body)>
-        ParseRequestAsync(Stream stream, CancellationToken ct)
+    private static async Task<HttpRequest?> ParseRequestAsync(Stream stream, CancellationToken ct)
     {
         var requestLine = await ReadLineAsync(stream, ct);
-        var parts = requestLine.Split(' ', 3);
-        var method = parts.Length > 0 ? parts[0] : "GET";
-        var path = parts.Length > 1 ? parts[1] : "/";
-
+        if (requestLine == null)
+            return null;
+        var parts = requestLine.Split(' ');
+        if (parts.Length != 3 || parts[2] != "HTTP/1.1")
+            throw new InvalidDataException("Expected an HTTP/1.1 request.");
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        while (true)
+        for (var count = 0; ; count++)
         {
-            var line = await ReadLineAsync(stream, ct);
-            if (line == "")
+            var line = await ReadLineAsync(stream, ct) ?? throw new InvalidDataException("Incomplete headers.");
+            if (line.Length == 0)
                 break;
-            if (headers.Count >= MaxHeaderCount)
+            if (count >= MaxHeaderCount)
                 throw new RequestTooLargeException();
             var colon = line.IndexOf(':');
-            if (colon > 0)
-                headers[line[..colon].Trim()] = line[(colon + 1)..].Trim();
+            if (colon <= 0 || !headers.TryAdd(line[..colon].Trim(), line[(colon + 1)..].Trim()))
+                throw new InvalidDataException("Invalid or duplicate header.");
         }
-
-        var body = "";
-        if (headers.TryGetValue("Content-Length", out var clStr) && int.TryParse(clStr, out var cl) && cl > 0)
-        {
-            if (cl > MaxBodyBytes)
-                throw new RequestTooLargeException();
-            var buf = new byte[cl];
-            await stream.ReadExactlyAsync(buf, ct);
-            body = Encoding.UTF8.GetString(buf);
-        }
-
-        return (method, path, headers, body);
+        if (headers.ContainsKey("Transfer-Encoding") || headers.ContainsKey("Expect"))
+            throw new InvalidDataException("Use Content-Length without chunked encoding or Expect.");
+        var length = 0;
+        if (headers.TryGetValue("Content-Length", out var value) && (!int.TryParse(value, out length) || length < 0))
+            throw new InvalidDataException("Invalid Content-Length.");
+        if (length > MaxBodyBytes)
+            throw new RequestTooLargeException();
+        if (parts[0] == "POST" && length == 0)
+            throw new InvalidDataException("POST requests require a JSON body and Content-Length.");
+        var bytes = new byte[length];
+        await stream.ReadExactlyAsync(bytes, ct);
+        return new HttpRequest(parts[0], parts[1], headers, Encoding.UTF8.GetString(bytes));
     }
 
-    private static async Task<string> ReadLineAsync(Stream stream, CancellationToken ct)
+    private static async Task<string?> ReadLineAsync(Stream stream, CancellationToken ct)
     {
-        var sb = new StringBuilder();
-        var buf = new byte[1];
+        var text = new StringBuilder();
+        var buffer = new byte[1];
+        var count = 0;
         while (true)
         {
-            var read = await stream.ReadAsync(buf.AsMemory(0, 1), ct);
-            if (read == 0)
-                break;
-            if (buf[0] == '\n')
-                break;
-            if (buf[0] != '\r')
-                sb.Append((char)buf[0]);
-            if (sb.Length > MaxLineBytes)
+            if (await stream.ReadAsync(buffer, ct) == 0)
+                return count == 0 ? null : throw new InvalidDataException("Incomplete HTTP line.");
+            if (++count > MaxLineBytes)
                 throw new RequestTooLargeException();
+            if (buffer[0] == '\n')
+                return text.ToString();
+            if (buffer[0] != '\r')
+                text.Append((char)buffer[0]);
         }
-        return sb.ToString();
     }
 
-    private static async Task SendResponseAsync(Stream stream, int status, object body, CancellationToken ct)
+    private static async Task SendResponseAsync(Stream stream, int status, object body, bool keepAlive, CancellationToken ct)
     {
-        var json = JsonSerializer.Serialize(body);
-        var jsonBytes = Encoding.UTF8.GetBytes(json);
-        var statusText = status switch { 200 => "OK", 400 => "Bad Request", 401 => "Unauthorized", 413 => "Payload Too Large", _ => "Error" };
-        var header = $"HTTP/1.1 {status} {statusText}\r\nContent-Type: application/json\r\nContent-Length: {jsonBytes.Length}\r\nConnection: close\r\n\r\n";
+        var json = JsonSerializer.SerializeToUtf8Bytes(body);
+        var reason = status switch { 200 => "OK", 400 => "Bad Request", 401 => "Unauthorized", 404 => "Not Found", 409 => "Conflict", 413 => "Payload Too Large", _ => "Internal Server Error" };
+        var header = $"HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {json.Length}\r\nConnection: {(keepAlive ? "keep-alive" : "close")}\r\n\r\n";
         await stream.WriteAsync(Encoding.UTF8.GetBytes(header), ct);
-        await stream.WriteAsync(jsonBytes, ct);
+        await stream.WriteAsync(json, ct);
         await stream.FlushAsync(ct);
     }
 
+    private sealed record HttpRequest(string Method, string Path, Dictionary<string, string> Headers, string Body);
+
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref disposed, 1) != 0)
+            return;
         cts.Cancel();
         listener.Stop();
-        GC.SuppressFinalize(this);
+        requests.Wait();
+        try { store.Dispose(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Leave recovery files in place when cleanup is blocked by a file lock or permissions.
+            onStatus($"Sync cleanup could not finish: {ex.Message}. Recovery files have been retained.");
+        }
+        finally { requests.Release(); }
     }
 }
 
-file class RequestTooLargeException : Exception;
-
-file record FileMetadata(string Filename, long Modified, string Hash);
-
-file class FileUpload
+file sealed class RequestTooLargeException : Exception;
+file sealed class FileUpload
 {
-    [JsonPropertyName("filename")]
+    public string SessionId { get; set; } = "";
     public string Filename { get; set; } = "";
-
-    [JsonPropertyName("content")]
     public JsonElement Content { get; set; }
+}
+file sealed class CompletionRequest
+{
+    public string SessionId { get; set; } = "";
 }

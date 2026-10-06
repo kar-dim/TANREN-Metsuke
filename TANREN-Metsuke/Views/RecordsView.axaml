@@ -39,9 +39,16 @@
                   VerticalAlignment="Top" Cursor="Hand"/>
         </Grid>
 
-        <ScrollViewer Grid.Row="1">
-          <ItemsControl x:Name="ExerciseRecordsList">
-            <ItemsControl.ItemTemplate>
+          <ListBox Grid.Row="1" x:Name="ExerciseRecordsList" Background="Transparent" BorderThickness="0"
+                   SelectionMode="Single" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.Styles>
+              <Style Selector="ListBoxItem">
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="Focusable" Value="False" />
+              </Style>
+            </ListBox.Styles>
+            <ListBox.ItemTemplate>
               <DataTemplate x:DataType="models:ExercisePersonalRecord">
                 <Border Margin="0,0,0,10"
                         Background="{StaticResource CardBg}"
@@ -54,7 +61,7 @@
                                FontFamily="{StaticResource OxaniumFont}"
                                Foreground="{StaticResource AccentBrush}"/>
 
-                    <Grid ColumnDefinitions="80,*,Auto" ColumnSpacing="8">
+                    <Grid ColumnDefinitions="100,*,Auto" ColumnSpacing="8" IsVisible="{Binding HasLoadRecords}">
                       <TextBlock Grid.Column="0" Text="Best weight"
                                  FontSize="11" Foreground="{StaticResource TextCaption}"
                                  VerticalAlignment="Center"/>
@@ -65,8 +72,8 @@
                                  FontSize="11" Foreground="{StaticResource TextMuted}"/>
                     </Grid>
 
-                    <Grid ColumnDefinitions="80,*,Auto" ColumnSpacing="8">
-                      <TextBlock Grid.Column="0" Text="Best set"
+                    <Grid ColumnDefinitions="100,*,Auto" ColumnSpacing="8" IsVisible="{Binding HasLoadRecords}">
+                      <TextBlock Grid.Column="0" Text="Best set volume"
                                  FontSize="11" Foreground="{StaticResource TextCaption}"
                                  VerticalAlignment="Center"/>
                       <TextBlock Grid.Column="1" Text="{Binding BestSetDisplay}"
@@ -76,12 +83,22 @@
                                  FontSize="11" Foreground="{StaticResource TextMuted}"/>
                     </Grid>
 
+                    <Grid ColumnDefinitions="100,*,Auto" ColumnSpacing="8">
+                      <TextBlock Grid.Column="0" Text="Most reps" FontSize="11" Foreground="{StaticResource TextCaption}" />
+                      <TextBlock Grid.Column="1" Text="{Binding BestRepsDisplay}" FontFamily="{StaticResource MonoFont}" FontSize="12" />
+                      <TextBlock Grid.Column="2" Text="{Binding BestReps.DateDisplay}" FontSize="11" Foreground="{StaticResource TextMuted}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="100,*,Auto" ColumnSpacing="8" IsVisible="{Binding HasLoadRecords}">
+                      <TextBlock Grid.Column="0" Text="Best session volume" FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource TextCaption}" />
+                      <TextBlock Grid.Column="1" Text="{Binding BestSessionDisplay}" FontFamily="{StaticResource MonoFont}" FontSize="12" />
+                      <TextBlock Grid.Column="2" Text="{Binding BestSession.DateDisplay}" FontSize="11" Foreground="{StaticResource TextMuted}" />
+                    </Grid>
+
                   </StackPanel>
                 </Border>
               </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
+            </ListBox.ItemTemplate>
+          </ListBox>
 
       </Grid>
     </Border>
@@ -89,11 +106,11 @@
     <!-- Hover info bar -->
     <Border Grid.Row="2" Background="{StaticResource ItemBg}" CornerRadius="6"
             Padding="12,8" Margin="0,10,0,0"
-            HorizontalAlignment="Center" MinWidth="400">
+            HorizontalAlignment="Center">
       <TextBlock x:Name="HoverInfo"
                  Text="Hover over a muscle group, click to see personal records"
                  FontSize="13" Foreground="{StaticResource TextSubtle}"
-                 HorizontalAlignment="Center"/>
+                 HorizontalAlignment="Center" TextWrapping="Wrap"/>
     </Border>
 
   </Grid>

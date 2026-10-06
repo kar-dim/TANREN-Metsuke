@@ -1,6 +1,7 @@
 ﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:TANREN_Metsuke.ViewModels"
+             xmlns:services="clr-namespace:TANREN_Metsuke.Services"
              x:Class="TANREN_Metsuke.Views.SyncView"
              x:DataType="vm:SyncViewModel">
 
@@ -12,6 +13,22 @@
       <TextBlock Text="Sync with Phone"
                  FontSize="22" FontWeight="Bold"
                  Foreground="{StaticResource TextPrimary}" />
+
+      <StackPanel Spacing="10">
+        <TextBlock Text="Local network adapter" FontSize="13" Foreground="{StaticResource TextMuted}" />
+        <ComboBox ItemsSource="{Binding Addresses}" SelectedItem="{Binding SelectedAddress}" HorizontalAlignment="Stretch"
+                  IsEnabled="{Binding !IsRefreshing}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="services:LanAddress">
+              <TextBlock Text="{Binding Display}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <Button Content="Refresh connection" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsRefreshing}"
+                HorizontalAlignment="Center" />
+        <TextBlock Text="After choosing an adapter, refresh and scan the new QR code." TextWrapping="Wrap"
+                   FontSize="12" Foreground="{StaticResource TextCaption}" TextAlignment="Center" />
+      </StackPanel>
 
       <!-- QR card, white background for scanner -->
       <Border Background="White" CornerRadius="16" Padding="20"
@@ -56,7 +73,7 @@
                      Text="- Phone and desktop must be on the same local network." />
           <TextBlock TextWrapping="Wrap" FontSize="14"
                      Foreground="{StaticResource TextCaption}"
-                     Text="- The QR code changes every time you restart the app." />
+                     Text="- The QR code changes when you restart or refresh the connection." />
           <TextBlock TextWrapping="Wrap" FontSize="14"
                      Foreground="{StaticResource TextCaption}"
                      Text="- If connection fails while using a VPN, check that it allows local network (LAN) traffic between devices. Many VPNs block this by default." />

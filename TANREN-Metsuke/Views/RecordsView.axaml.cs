@@ -22,9 +22,15 @@ public partial class RecordsView : BodyMapView
 
     protected override void OnViewModelChanged()
     {
+        currentVm?.RecordsChanged -= OnRecordsChanged;
+        currentVm = ViewModel;
+        currentVm?.RecordsChanged += OnRecordsChanged;
         if (ViewModel != null)
             HeaderText.Text = $"{ViewModel.TotalExercisesTracked} exercises tracked";
     }
+
+    private RecordsViewModel? currentVm;
+    private void OnRecordsChanged() => RefreshOpenDetail();
 
     protected override Color ColorForGroup(MuscleGroup group) =>
         ViewModel != null && ViewModel.HasRecords(group) ? AccentColor : BodyMapHelper.MuscleInactive;
