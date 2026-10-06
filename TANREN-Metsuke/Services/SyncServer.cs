@@ -160,7 +160,7 @@ public sealed class SyncServer : IDisposable
                     var completion = JsonSerializer.Deserialize<CompletionRequest>(body, JsonDefaults.CaseInsensitive)
                         ?? throw new InvalidDataException("Missing completion request.");
                     var changed = store.Complete(completion.SessionId);
-                    onStatus(changed ? "Sync complete! Previous data saved in sync-backups." : "Sync complete; desktop is up to date.");
+                    onStatus(changed ? "Sync complete! Previous data saved in sync-backups." : "Sync complete, desktop is up to date.");
                     if (changed)
                         onSyncCompleted();
                     await SendResponseAsync(stream, 200, new { ok = true }, keepAlive, ct);
